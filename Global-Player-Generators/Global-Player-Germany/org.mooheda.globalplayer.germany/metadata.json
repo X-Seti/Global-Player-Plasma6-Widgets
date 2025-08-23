@@ -1,0 +1,20 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "",
+                "Name": "X-Seti (Mooheda)"
+            }
+        ],
+        "Category": "Multimedia",
+        "Description": "Höre deutsche Radiosender (RTL Radio, 1LIVE, Bayern 3, etc.)",
+        "Icon": "audio-headphones",
+        "Id": "org.mooheda.globalplayer.germany",
+        "Name": "Global Player Deutschland",
+        "Version": "3.2",
+        "Website": "",
+        "BugReportUrl": ""
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "KPackageStructure": "Plasma/Applet"
+}

@@ -1,6 +1,18 @@
-#!/usr/bin/env bash
-# Global Player Regional Package Selector - Complete Edition
+# X-Seti - Global Player Regional Package Selector - Complete Edition
 # Master script to create different regional packages
+
+#!/bin/sh
+# Ensure we are running under bash, not sh/dash
+if [ -z "$BASH_VERSION" ]; then
+    # Try common bash locations
+    for b in /usr/bin/bash /bin/bash; do
+        if [ -x "$b" ]; then
+            exec "$b" "$0" "$@"
+        fi
+    done
+    echo "Error: This script requires bash but it was not found." >&2
+    exit 1
+fi
 
 set -euo pipefail
 
@@ -11,7 +23,7 @@ echo "Which version would you like to create?"
 echo ""
 echo "🌍 English-Speaking:"
 echo "1) 🇬🇧 UK Version (Heart, Capital, Classic FM, LBC, etc.)"
-echo "2) 🇺🇸 USA Version (iHeartRadio, NPR, KEXP, Soma FM, etc.)"  
+echo "2) 🇺🇸 USA Version (iHeartRadio, NPR, KEXP, Soma FM, etc.)"
 echo "3) 🇨🇦 Canada Version (Jack FM, Virgin Radio, CBC, etc.)"
 echo ""
 echo "🌍 European:"
@@ -25,56 +37,6 @@ echo "8) ℹ️  Show detailed package information"
 echo "9) 🚀 Mars Country Radio (Coming Soon to a planet near you!)"
 echo ""
 read -p "Enter choice (1-8): " choice
-
-case $choice in
-    1) 
-        echo "[+] Creating UK package..."
-        if [[ -f "./create_uk_package.sh" ]]; then
-            ./create_uk_package.sh
-        else
-            echo "❌ create_uk_package.sh not found!"
-            echo "💡 You need to create the UK generator script first."
-            exit 1
-        fi
-        ;;
-    2) 
-        echo "[+] Creating USA package..."
-        if [[ -f "./create_usa_package.sh" ]]; then
-            ./create_usa_package.sh
-        else
-            echo "❌ create_usa_package.sh not found!"
-            echo "💡 You need to create the USA generator script first."
-            exit 1
-        fi
-        ;;
-    3) 
-        echo "[+] Creating Canada package..."
-        if [[ -f "./create_canada_package.sh" ]]; then
-            ./create_canada_package.sh
-        else
-            echo "❌ create_canada_package.sh not found!"
-            echo "💡 You need to create the Canada generator script first."
-            exit 1
-        fi
-        ;;
-    #!/usr/bin/env bash
-# Global Player Regional Package Selector
-# Master script to create different regional packages
-
-set -euo pipefail
-
-echo "🎵 Global Player Regional Package Creator"
-echo "========================================"
-echo ""
-echo "Which version would you like to create?"
-echo ""
-echo "1) 🇬🇧 UK Version (Heart, Capital, Classic FM, LBC, etc.)"
-echo "2) 🇺🇸 USA Version (iHeartRadio, NPR, KEXP, Soma FM, etc.)"  
-echo "3) 🇨🇦 Canada Version (Jack FM, Virgin Radio, CBC, etc.)"
-echo "4) 🌍 All Versions (creates all three packages)"
-echo "5) ℹ️  Show package details"
-echo ""
-read -p "Enter choice (1-5): " choice
 
 case $choice in
     1) 
