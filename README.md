@@ -1,4 +1,4 @@
-# Global Player Plasma 6 Widget - X-Seti
+# Global Player Plasma 6 Widget - X-Seti - Sept 14 2025
 
 A KDE Plasma 6 widget for listening to Global Player radio stations.
 
@@ -8,6 +8,7 @@ A KDE Plasma 6 widget for listening to Global Player radio stations.
 - Panel and desktop widget modes
 - Sign-in support for premium features
 - Logging support
+- Added Plasma 5 Compatible installer
 
 ## Installation
 

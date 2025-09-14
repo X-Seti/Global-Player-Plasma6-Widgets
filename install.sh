@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# X-Seti - Sept 14 2025 - globalplayer 3.22
 set -euo pipefail
 
 PLASMOID_ID="org.mooheda.globalplayer"
