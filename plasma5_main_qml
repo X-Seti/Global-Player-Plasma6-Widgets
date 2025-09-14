@@ -1,0 +1,494 @@
+// X-Seti - Aug12 2025 - GlobalPlayer - Plasma 5 Compatible 3.2.2
+import QtQuick 2.15
+import QtQuick.Layouts 1.15
+import QtQuick.Controls 2.15
+import org.kde.plasma.core 2.0 as PlasmaCore
+import org.kde.plasma.components 3.0 as PC3
+import org.kde.plasma.plasmoid 2.0
+
+Item {
+    id: root
+
+    // Disable system tooltips completely
+    Plasmoid.toolTipMainText: ""
+    Plasmoid.toolTipSubText: ""
+    
+    // Popup configuration
+    Plasmoid.status: isPlaying ? PlasmaCore.Types.ActiveStatus : PlasmaCore.Types.PassiveStatus
+    
+    property var stationsModel: []
+    property int stationIndex: 0
+    property string selectedStation: {
+        if (stationsModel.length === 0) return ""
+        if (stationIndex < 0 || stationIndex >= stationsModel.length) return ""
+        return stationsModel[stationIndex]
+    }
+    property string nowArtist: ""
+    property string nowTitle: ""
+    property string nowShow: ""
+    property string playState: "Stopped"
+    property bool loggingEnabled: false
+    property bool pushNotifications: false
+    property url artworkUrl: ""
+
+    // Track last notification to avoid spam
+    property string lastNotifiedTrack: ""
+
+    // Computed properties for display
+    property string displayTitle: {
+        if (nowArtist && nowTitle) {
+            return nowArtist + " — " + nowTitle
+        } else if (nowTitle) {
+            return nowTitle
+        } else if (selectedStation) {
+            return selectedStation
+        } else {
+            return "Global Player"
+        }
+    }
+
+    property bool isPlaying: playState === "Playing"
+
+    // Configure popup size and behavior
+    Plasmoid.switchWidth: PlasmaCore.Units.gridUnit * 20
+    Plasmoid.switchHeight: PlasmaCore.Units.gridUnit * 25
+
+    // Send KDE notification for track changes
+    function sendTrackNotification() {
+        var trackInfo = displayTitle
+        if (trackInfo && trackInfo !== "Global Player" && trackInfo !== lastNotifiedTrack) {
+            lastNotifiedTrack = trackInfo
+            var body = selectedStation
+            if (nowShow) {
+                body += "\nShow: " + nowShow
+            }
+            
+            // Use qdbus to send notification
+            var cmd = 'qdbus org.freedesktop.Notifications /org/freedesktop/Notifications ' +
+                     'org.freedesktop.Notifications.Notify ' +
+                     '"Global Player" 0 "audio-headphones" "' + trackInfo.replace(/"/g, '\\"') + 
+                     '" "' + body.replace(/"/g, '\\"') + '" "[]" "{}" 5000'
+            execDS.connectSource(cmd)
+        }
+    }
+
+    // Watch for track changes and send notifications
+    onDisplayTitleChanged: {
+        if (pushNotifications && isPlaying) {
+            sendTrackNotification()
+        }
+    }
+
+    // Poll metadata every 10s
+    Timer {
+        id: pollTimer
+        interval: 10000
+        running: true
+        repeat: true
+        onTriggered: {
+            getNowPlaying()
+        }
+    }
+
+    PlasmaCore.DataSource {
+        id: execDS
+        engine: "executable"
+
+        onNewData: function(sourceName, data) {
+            var out = (data["stdout"] || "").trim()
+            var err = (data["stderr"] || "").trim()
+
+            if (err) {
+                console.log("Command error:", err)
+            }
+
+            if (sourceName.indexOf("GetNowPlaying") !== -1) {
+                try {
+                    var m = JSON.parse(out)
+                    nowArtist = m.artist || ""
+                    nowTitle = m.title || ""
+                    nowShow = m.show || ""
+                    playState = m.state || playState
+                    if (m.artworkPath) {
+                        artworkUrl = "file://" + m.artworkPath
+                    }
+                } catch (e) {
+                    console.log("Error parsing GetNowPlaying:", e)
+                }
+            } else if (sourceName.indexOf("GetState") !== -1) {
+                try {
+                    var s = JSON.parse(out)
+                    playState = s.state || playState
+                    loggingEnabled = s.logging === true
+                    pushNotifications = s.notifications === true
+                    var st = s.station || ""
+                    if (st.length > 0 && stationsModel.indexOf(st) >= 0) {
+                        stationIndex = stationsModel.indexOf(st)
+                    }
+                } catch (e) {
+                    console.log("Error parsing GetState:", e)
+                }
+            } else if (sourceName.indexOf("GetStations") !== -1) {
+                try {
+                    var arr = JSON.parse(out)
+                    stationsModel = arr
+                    if (arr.length > 0 && stationIndex >= arr.length) {
+                        stationIndex = 0
+                    }
+                } catch (e) {
+                    console.log("Error parsing GetStations:", e)
+                }
+            }
+            disconnectSource(sourceName)
+        }
+    }
+
+    function qdbusCall(method, args) {
+        var cmd = "qdbus org.mooheda.gpd /org/mooheda/gpd org.mooheda.gpd1." + method
+        if (args && args.length > 0) {
+            for (var i = 0; i < args.length; ++i) {
+                var a = ("" + args[i]).replace(/\"/g, "\\\"")
+                cmd += " \"" + a + "\""
+            }
+        }
+        execDS.connectSource(cmd)
+    }
+
+    function getNowPlaying() {
+        qdbusCall("GetNowPlaying", [])
+    }
+
+    function getState() {
+        qdbusCall("GetState", [])
+    }
+
+    function refreshStations() {
+        qdbusCall("GetStations", [])
+    }
+
+    function signIn() {
+        qdbusCall("SignIn", [])
+    }
+
+    function togglePlayPause() {
+        if (isPlaying) {
+            qdbusCall("Pause", [])
+        } else {
+            playCurrent()
+        }
+    }
+
+    function playCurrent() {
+        if (stationsModel.length === 0) return
+        if (stationIndex < 0 || stationIndex >= stationsModel.length) {
+            stationIndex = 0
+        }
+        selectedStation = stationsModel[stationIndex]
+        qdbusCall("Play", [selectedStation])
+        if (!pollTimer.running) {
+            pollTimer.start()
+        }
+        getState()
+        getNowPlaying()
+    }
+
+    function nextStation() {
+        if (stationsModel.length === 0) return
+        stationIndex = (stationIndex + 1) % stationsModel.length
+        playCurrent()
+    }
+
+    function prevStation() {
+        if (stationsModel.length === 0) return
+        stationIndex = (stationIndex - 1 + stationsModel.length) % stationsModel.length
+        playCurrent()
+    }
+
+    Component.onCompleted: {
+        refreshStations()
+        getState()
+        pollTimer.start()
+        
+        // Explicitly disable all tooltips
+        Plasmoid.toolTipMainText = ""
+        Plasmoid.toolTipSubText = ""
+    }
+
+    // Compact representation - panel icon only
+    Plasmoid.compactRepresentation: Item {
+        id: compactRoot
+
+        // Main compact display
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: 2
+            radius: PlasmaCore.Units.smallSpacing
+            border.color: PlasmaCore.ColorScope.textColor
+            border.width: 1
+            color: "transparent"
+
+            Image {
+                anchors.fill: parent
+                anchors.margins: 2
+                fillMode: Image.PreserveAspectFit
+                source: artworkUrl
+                visible: artworkUrl !== ""
+            }
+
+            PC3.Label {
+                anchors.centerIn: parent
+                text: "♪"
+                opacity: 0.6
+                font.pointSize: theme.defaultFont.pointSize * 1.2
+                visible: artworkUrl === ""
+            }
+
+            // Play/pause indicator overlay
+            Rectangle {
+                anchors.bottom: parent.bottom
+                anchors.right: parent.right
+                anchors.margins: 1
+                width: 8
+                height: 8
+                radius: 4
+                color: isPlaying ? theme.positiveTextColor : theme.neutralTextColor
+                opacity: 0.8
+            }
+        }
+
+        // Click handler - no hover, no tooltip
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            
+            onClicked: function(mouse) {
+                if (mouse.button === Qt.LeftButton) {
+                    plasmoid.expanded = !plasmoid.expanded
+                } else if (mouse.button === Qt.RightButton) {
+                    contextMenu.open()
+                }
+            }
+        }
+
+        // Context menu for right-click
+        PC3.Menu {
+            id: contextMenu
+
+            PC3.MenuItem {
+                text: isPlaying ? "◼ Stop" : "▶ Play"
+                onTriggered: togglePlayPause()
+            }
+
+            PC3.MenuSeparator {}
+
+            PC3.MenuItem {
+                text: "◀ Previous"
+                onTriggered: prevStation()
+                enabled: stationsModel.length > 1
+            }
+
+            PC3.MenuItem {
+                text: "Next ▶"
+                onTriggered: nextStation()
+                enabled: stationsModel.length > 1
+            }
+
+            PC3.MenuSeparator {}
+
+            Repeater {
+                model: Math.min(stationsModel.length, 8) // Limit menu items
+                delegate: PC3.MenuItem {
+                    text: stationsModel[index]
+                    checkable: true
+                    checked: index === stationIndex
+                    onTriggered: {
+                        stationIndex = index
+                        playCurrent()
+                    }
+                }
+            }
+
+            PC3.MenuSeparator {}
+
+            PC3.MenuItem {
+                text: "↻ Refresh"
+                onTriggered: refreshStations()
+            }
+
+            PC3.MenuItem {
+                text: "Sign In"
+                onTriggered: signIn()
+            }
+        }
+    }
+
+    // Full representation - the popup content
+    Plasmoid.fullRepresentation: Item {
+        id: fullRoot
+        
+        Layout.preferredWidth: PlasmaCore.Units.gridUnit * 20
+        Layout.preferredHeight: PlasmaCore.Units.gridUnit * 25
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: PlasmaCore.Units.largeSpacing
+            spacing: PlasmaCore.Units.largeSpacing
+
+            // Header
+            RowLayout {
+                Layout.fillWidth: true
+                
+                PC3.Label {
+                    text: "Global Player"
+                    font.bold: true
+                    font.pointSize: theme.defaultFont.pointSize * 1.2
+                    Layout.fillWidth: true
+                }
+                
+                PC3.Button {
+                    text: "Sign In"
+                    onClicked: signIn()
+                }
+            }
+
+            // Large artwork and track info section
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: PlasmaCore.Units.largeSpacing
+
+                // Artwork
+                Rectangle {
+                    Layout.preferredWidth: PlasmaCore.Units.gridUnit * 5
+                    Layout.preferredHeight: PlasmaCore.Units.gridUnit * 5
+                    radius: PlasmaCore.Units.smallSpacing
+                    border.color: PlasmaCore.ColorScope.textColor
+                    border.width: 1
+                    color: theme.backgroundColor
+
+                    Image {
+                        anchors.fill: parent
+                        anchors.margins: 4
+                        fillMode: Image.PreserveAspectFit
+                        source: artworkUrl
+                        visible: artworkUrl !== ""
+                    }
+
+                    PC3.Label {
+                        anchors.centerIn: parent
+                        text: "♪"
+                        opacity: 0.4
+                        font.pointSize: theme.defaultFont.pointSize * 3
+                        visible: artworkUrl === ""
+                    }
+                }
+
+                // Track info
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: PlasmaCore.Units.smallSpacing
+
+                    PC3.Label {
+                        Layout.fillWidth: true
+                        text: displayTitle
+                        wrapMode: Text.WordWrap
+                        font.weight: Font.Medium
+                        font.pointSize: theme.defaultFont.pointSize * 1.1
+                        maximumLineCount: 2
+                        elide: Text.ElideRight
+                    }
+
+                    PC3.Label {
+                        Layout.fillWidth: true
+                        text: nowShow ? ("Show: " + nowShow) : ""
+                        wrapMode: Text.WordWrap
+                        opacity: 0.8
+                        visible: nowShow !== ""
+                    }
+
+                    PC3.Label {
+                        Layout.fillWidth: true
+                        text: "Status: " + playState
+                        opacity: 0.7
+                        font.pointSize: theme.smallFont.pointSize
+                    }
+                }
+            }
+
+            // Station selector
+            PC3.ComboBox {
+                id: stationPicker
+                Layout.fillWidth: true
+                model: stationsModel
+                currentIndex: stationIndex
+                onActivated: {
+                    stationIndex = currentIndex
+                    playCurrent()
+                }
+            }
+
+            // Playback controls
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignHCenter
+                spacing: PlasmaCore.Units.largeSpacing
+
+                PC3.Button {
+                    text: "◀"
+                    onClicked: prevStation()
+                    enabled: stationsModel.length > 1
+                }
+
+                PC3.Button {
+                    text: isPlaying ? "◼" : "▶"
+                    font.pointSize: theme.defaultFont.pointSize * 1.5
+                    onClicked: togglePlayPause()
+                    Layout.preferredWidth: PlasmaCore.Units.gridUnit * 3
+                }
+
+                PC3.Button {
+                    text: "▶"
+                    onClicked: nextStation()
+                    enabled: stationsModel.length > 1
+                }
+            }
+
+            // Settings section
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: PlasmaCore.Units.smallSpacing
+
+                PC3.CheckBox {
+                    text: "Enable logging to ~/globalplayer/gp.logs"
+                    checked: loggingEnabled
+                    onToggled: qdbusCall("SetLogging", [checked ? "true" : "false"])
+                }
+
+                PC3.CheckBox {
+                    text: "Push notifications for track changes"
+                    checked: pushNotifications
+                    onToggled: qdbusCall("SetNotifications", [checked ? "true" : "false"])
+                }
+            }
+
+            // Bottom controls
+            RowLayout {
+                Layout.fillWidth: true
+
+                Item {
+                    Layout.fillWidth: true
+                }
+
+                PC3.Button {
+                    text: "↻"
+                    onClicked: refreshStations()
+                    PC3.ToolTip.text: "Refresh station list"
+                }
+            }
+
+            // Spacer
+            Item {
+                Layout.fillHeight: true
+            }
+        }
+    }
+}
