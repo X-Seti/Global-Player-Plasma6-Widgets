@@ -1,0 +1,23 @@
+[Desktop Entry]
+Name=Global Player
+Comment=Listen to Global Player stations (dynamic + static list)
+Icon=audio-headphones
+Type=Service
+ServiceTypes=Plasma/Applet
+
+X-KDE-PluginInfo-Author=X-Seti (Mooheda)
+X-KDE-PluginInfo-Email=keithvc1972@hotmail.com
+X-KDE-PluginInfo-Name=org.mooheda.globalplayer
+X-KDE-PluginInfo-Version=3.2.2
+X-KDE-PluginInfo-Category=Multimedia
+X-KDE-PluginInfo-Depends=
+X-KDE-PluginInfo-License=GPL
+X-KDE-PluginInfo-EnabledByDefault=true
+X-KDE-PluginInfo-Website=https://github.com/X-Seti/Global-Player-Plasma6-Widgets/upload/main/org.mooheda.globalplayer
+
+X-Plasma-API=declarativeappletscript
+X-Plasma-MainScript=ui/main.qml
+
+# Plasma 5 specific metadata
+X-KDE-ServiceTypes=Plasma/Applet
+X-Plasma-DefaultSize=200,200

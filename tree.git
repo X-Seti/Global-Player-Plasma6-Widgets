@@ -1,0 +1,47 @@
+.
+├── debug_files_script.sh
+├── globalplayer-daemon
+│   ├── gpd.py
+│   ├── playback_mpv.py
+│   └── stations_static.json
+├── Global-Player-Generators
+│   ├── create_canada_package.sh
+│   ├── create_germany_package.sh
+│   ├── create_italy_package.sh
+│   ├── create_package_selector.sh
+│   ├── create_spain_package.sh
+│   ├── create_uk_package.sh
+│   ├── create_usa_package.sh
+│   └── Global-Player-Germany
+│       ├── globalplayer-daemon
+│       │   ├── gpd.py
+│       │   ├── playback_mpv.py
+│       │   └── stations_static.json
+│       ├── gpd-germany.service
+│       ├── install.sh
+│       ├── org.mooheda.globalplayer.germany
+│       │   ├── contents
+│       │   │   └── ui
+│       │   │       └── main.qml
+│       │   └── metadata.json
+│       ├── README.md
+│       └── uninstall.sh
+├── gpd.service
+├── install.sh
+├── LICENSE
+├── metadata_desktop
+├── org.mooheda.globalplayer
+│   ├── contents
+│   │   └── ui
+│   ├── v5
+│   │   └── metadata.desktop
+│   └── v6
+│       ├── metadata.desktop
+│       └── metadata.json
+├── plasma5_main_qml
+├── plasma6_main_qml
+├── README.md
+├── tree.git
+└── uninstall.sh
+
+13 directories, 32 files
