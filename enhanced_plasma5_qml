@@ -1,16 +1,16 @@
-// X-Seti - Sept 15 2025 - Global Player - Plasma 6 Clean Version with D-Bus Integration
+// X-Seti - Sept 15 2025 - Global Player - Plasma 5 with D-Bus Integration
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 import QtQuick.Controls 2.15
-import org.kde.plasma.core as PlasmaCore
+import org.kde.plasma.core 2.0 as PlasmaCore
 import org.kde.plasma.components 3.0 as PC3
 import org.kde.plasma.plasmoid 2.0
 import org.kde.plasma.plasma5support 2.0 as Plasma5Support
 
-PlasmoidItem {
+Item {
     id: root
 
-    // D-Bus integrated state
+    // D-Bus integrated state (from Plasma 6 version)
     property var stationsModel: []
     property int stationIndex: 0
     property string selectedStation: {
@@ -53,30 +53,16 @@ PlasmoidItem {
         }
     }
 
-    // Song history
+    // Song history (keeping Plasma 5 feature)
     property var playedSongs: []
     
-    // Media player state
+    // Media player state (keeping Plasma 5 feature)
     property var mediaPlaylist: []
     property int mediaIndex: 0
     property int mediaPosition: 0
     property int mediaDuration: 0
 
-    // Tooltip for panel mode
-    toolTipSubText: {
-        if (playState === "Playing" && selectedStation) {
-            return "Playing on " + selectedStation
-        } else {
-            return playState
-        }
-    }
-
-    // Song history model
-    ListModel {
-        id: playedSongsModel
-    }
-
-    // Poll metadata timer
+    // Poll metadata every 10s (from Plasma 6 version)
     Timer {
         id: pollTimer
         interval: 10000
@@ -87,7 +73,7 @@ PlasmoidItem {
         }
     }
 
-    // D-Bus Data Source
+    // D-Bus Data Source (ported from Plasma 6)
     Plasma5Support.DataSource {
         id: execDS
         engine: "executable"
@@ -116,10 +102,6 @@ PlasmoidItem {
                     // Add to history when in radio mode
                     if (!mediaMode && (nowArtist || nowTitle)) {
                         addToHistory(nowTitle, nowArtist)
-                        // Show notification for new songs
-                        if (nowArtist && nowTitle) {
-                            showNotification("Now Playing", nowArtist + " - " + nowTitle)
-                        }
                     }
 
                 } catch (e) {
@@ -151,67 +133,10 @@ PlasmoidItem {
             }
             disconnectSource(sourceName)
         }
-    }
-
-    // Notification system
-    function showNotification(title, message, timeout) {
-        if (pushNotifications) {
-            // Create a simple visual notification
-            notificationTimer.title = title
-            notificationTimer.message = message
-            notificationTimer.restart()
-        }
-    }
-
-    Timer {
-        id: notificationTimer
-        interval: 3000
-        property string title: ""
-        property string message: ""
-        onTriggered: {
-            // Reset notification
-            title = ""
-            message = ""
-        }
-    }
-
-    // Visual notification overlay
-    Rectangle {
-        id: notificationOverlay
-        visible: notificationTimer.running && notificationTimer.title !== ""
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.topMargin: PlasmaCore.Units.smallSpacing
-        width: childrenRect.width + PlasmaCore.Units.largeSpacing
-        height: childrenRect.height + PlasmaCore.Units.smallSpacing
-        color: PlasmaCore.Theme.backgroundColor
-        border.color: PlasmaCore.Theme.highlightColor
-        border.width: 2
-        radius: PlasmaCore.Units.smallSpacing
-        opacity: 0.95
-        z: 1000
-
-        ColumnLayout {
-            anchors.centerIn: parent
-            spacing: PlasmaCore.Units.smallSpacing / 2
-
-            PC3.Label {
-                text: notificationTimer.title
-                font.bold: true
-                font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 0.9
-                Layout.alignment: Qt.AlignHCenter
             }
-
-            PC3.Label {
-                text: notificationTimer.message
-                font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
-                Layout.alignment: Qt.AlignHCenter
-                visible: notificationTimer.message !== ""
-            }
-        }
     }
 
-    // D-Bus helper functions
+    // D-Bus helper functions (ported from Plasma 6)
     function qdbusCall(method, args) {
         var cmd = "qdbus org.mooheda.gpd /org/mooheda/gpd org.mooheda.gpd1." + method
         if (args && args.length > 0) {
@@ -241,7 +166,28 @@ PlasmoidItem {
         qdbusCall("SignIn", [])
     }
 
-    // Control functions
+    // Simplified hotkey handling (removed complex registration to avoid syntax issues)
+    function handleGlobalHotkey(action) {
+        console.log("Global hotkey activated:", action)
+        
+        if (action === "play-pause" || action === "playpause") {
+            togglePlay()
+        } else if (action === "stop") {
+            stopPlayback()
+        } else if (action === "next") {
+            nextStation()
+        } else if (action === "previous" || action === "prev") {
+            prevStation()
+        } else if (action === "mode-toggle") {
+            switchMode()
+        } else if (action === "refresh") {
+            if (!mediaMode) {
+                refreshStations()
+            }
+        }
+    }
+
+    // Enhanced control functions
     function togglePlay() {
         if (mediaMode) {
             // Local media mode - keep existing simulation
@@ -332,7 +278,7 @@ PlasmoidItem {
         }
     }
 
-    // History management
+    // History management (keeping Plasma 5 feature)
     function addToHistory(song, artist) {
         var newSong = {
             "time": new Date().toLocaleTimeString(),
@@ -359,114 +305,80 @@ PlasmoidItem {
         }
     }
 
-    // Component initialization
+    // Song history model
+    ListModel {
+        id: playedSongsModel
+    }
+
+    // Startup (ported from Plasma 6)
     Component.onCompleted: {
-        console.log("Global Player Plasma 6 started with D-Bus integration")
+        console.log("Global Player Plasma 5 started with D-Bus integration")
         refreshStations()
         getState()
         pollTimer.start()
         addToHistory("Welcome to Global Player", "System")
     }
 
-    // Compact panel representation
-    compactRepresentation: Item {
-        Layout.preferredWidth: PlasmaCore.Units.gridUnit * 2
-        Layout.preferredHeight: PlasmaCore.Units.gridUnit * 2
+    // PANEL MODE - Just the cover art icon (enhanced)
+    Rectangle {
+        visible: plasmoid.formFactor === PlasmaCore.Types.Horizontal || plasmoid.formFactor === PlasmaCore.Types.Vertical
+        anchors.fill: parent
+        anchors.margins: 2
+        radius: 4
+        color: "#2a2a2a"
+        border.color: isPlaying ? "#4CAF50" : "#666"
+        border.width: 2
 
-        // Main artwork display
-        Rectangle {
+        // Cover art or music note
+        Image {
             anchors.fill: parent
-            anchors.margins: 2
-            radius: PlasmaCore.Units.smallSpacing
-            color: "#2a2a2a"
-            border.color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.textColor
-            border.width: 2
-
-            Image {
-                anchors.fill: parent
-                anchors.margins: 4
-                fillMode: Image.PreserveAspectFit
-                source: artworkUrl
-                visible: artworkUrl !== ""
-            }
-
-            PC3.Label {
-                anchors.centerIn: parent
-                text: mediaMode ? "♫" : "♪"
-                opacity: 0.6
-                font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 1.2
-                color: PlasmaCore.Theme.textColor
-                visible: artworkUrl === ""
-            }
-
-            // Playing indicator overlay
-            Rectangle {
-                anchors.bottom: parent.bottom
-                anchors.right: parent.right
-                anchors.margins: 1
-                width: 8
-                height: 8
-                radius: 4
-                color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.neutralTextColor
-                opacity: 0.8
-            }
+            anchors.margins: 4
+            source: artworkUrl
+            fillMode: Image.PreserveAspectFit
+            visible: artworkUrl !== ""
         }
 
-        // Click handler to open popup
+        PC3.Label {
+            anchors.centerIn: parent
+            text: mediaMode ? "♫" : "♪"
+            font.pointSize: 16
+            color: "#fff"
+            visible: artworkUrl === ""
+        }
+
+        // Playing indicator overlay
+        Rectangle {
+            anchors.bottom: parent.bottom
+            anchors.right: parent.right
+            anchors.margins: 1
+            width: 8
+            height: 8
+            radius: 4
+            color: isPlaying ? "#4CAF50" : "#666"
+            opacity: 0.8
+        }
+
+        // Click handlers
         MouseArea {
             anchors.fill: parent
-            acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            
             onClicked: function(mouse) {
                 if (mouse.button === Qt.LeftButton) {
-                    togglePlay() // LEFT CLICK = PLAY/PAUSE
+                    togglePlay()
                 } else if (mouse.button === Qt.RightButton) {
-                    nextStation() // RIGHT CLICK = NEXT STATION
-                } else if (mouse.button === Qt.MiddleButton) {
-                    root.expanded = !root.expanded // MIDDLE CLICK = OPEN POPUP
+                    nextStation()
                 }
             }
-            onPressAndHold: {
-                root.expanded = !root.expanded // LONG PRESS = OPEN POPUP
-            }
-            
-            // Add wheel support for station switching
-            onWheel: function(wheel) {
-                if (wheel.angleDelta.y > 0) {
-                    prevStation() // SCROLL UP = PREVIOUS STATION
-                } else {
-                    nextStation() // SCROLL DOWN = NEXT STATION
-                }
-                wheel.accepted = true
-            }
-
-            // Tooltip on hover
-            PC3.ToolTip {
-                text: {
-                    var tooltip = displayTitle
-                    if (nowShow && nowShow !== "") {
-                        tooltip += "\nShow: " + nowShow
-                    }
-                    tooltip += "\nStatus: " + playState
-                    tooltip += "\n\nControls:"
-                    tooltip += "\n• Left click: Play/Pause"
-                    tooltip += "\n• Right click: Next station"
-                    tooltip += "\n• Middle click: Open controls"
-                    tooltip += "\n• Scroll: Change stations"
-                    return tooltip
-                }
-                visible: parent.containsMouse && !root.expanded
-                delay: 500
-            }
+        }
     }
 
-    // Full widget representation
-    fullRepresentation: ColumnLayout {
+    // DESKTOP MODE - Full interface (enhanced with D-Bus)
+    ColumnLayout {
+        visible: !(plasmoid.formFactor === PlasmaCore.Types.Horizontal || plasmoid.formFactor === PlasmaCore.Types.Vertical)
         anchors.fill: parent
-        anchors.margins: PlasmaCore.Units.largeSpacing
-        spacing: PlasmaCore.Units.largeSpacing
-
-        Layout.preferredWidth: PlasmaCore.Units.gridUnit * 40
-        Layout.preferredHeight: PlasmaCore.Units.gridUnit * 30
+        anchors.margins: 16
+        spacing: 12
 
         // Top section - Cover art and station info
         RowLayout {
@@ -479,7 +391,7 @@ PlasmoidItem {
                 Layout.preferredHeight: 120
                 radius: 8
                 color: "#2a2a2a"
-                border.color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.textColor
+                border.color: isPlaying ? "#4CAF50" : "#666"
                 border.width: 2
 
                 Image {
@@ -494,7 +406,7 @@ PlasmoidItem {
                     anchors.centerIn: parent
                     text: mediaMode ? "♫" : "♪"
                     font.pointSize: 32
-                    color: PlasmaCore.Theme.textColor
+                    color: "#fff"
                     visible: artworkUrl === ""
                 }
             }
@@ -522,7 +434,26 @@ PlasmoidItem {
                     wrapMode: Text.WordWrap
                 }
 
-                // Line 3: Playback controls (centered) - THEME AWARE COLORS
+                // Line 3: Navigation arrows (left/right of center)
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: 12
+
+                    PC3.Button {
+                        text: "◀"
+                        onClicked: prevStation()
+                        enabled: mediaMode || stationsModel.length > 1
+                    }
+
+                    PC3.Button {
+                        text: "▶"
+                        onClicked: nextStation()
+                        enabled: mediaMode || stationsModel.length > 1
+                    }
+                }
+
+                // Line 4: Playback controls (centered)
                 RowLayout {
                     Layout.fillWidth: true
                     Layout.alignment: Qt.AlignHCenter
@@ -532,90 +463,24 @@ PlasmoidItem {
                         text: "⏮"
                         onClicked: prevStation()
                         enabled: mediaMode || stationsModel.length > 1
-                        
-                        background: Rectangle {
-                            color: parent.enabled ? 
-                                   (parent.pressed ? PlasmaCore.Theme.highlightColor : PlasmaCore.Theme.backgroundColor) : 
-                                   PlasmaCore.Theme.disabledTextColor
-                            radius: 4
-                            border.color: parent.enabled ? PlasmaCore.Theme.textColor : PlasmaCore.Theme.disabledTextColor
-                            border.width: 1
-                        }
-                        
-                        contentItem: Text {
-                            text: parent.text
-                            color: parent.enabled ? PlasmaCore.Theme.textColor : PlasmaCore.Theme.disabledTextColor
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                            font.pointSize: 12
-                        }
                     }
 
                     PC3.Button {
                         text: isPlaying ? "⏸" : "▶️"
                         font.pointSize: 14
                         onClicked: togglePlay()
-                        
-                        background: Rectangle {
-                            color: parent.pressed ? PlasmaCore.Theme.highlightColor : PlasmaCore.Theme.backgroundColor
-                            radius: 4
-                            border.color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.textColor
-                            border.width: 2
-                        }
-                        
-                        contentItem: Text {
-                            text: parent.text
-                            color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.textColor
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                            font.pointSize: parent.font.pointSize
-                        }
                     }
 
                     PC3.Button {
                         text: "⏹"
                         onClicked: stopPlayback()
                         enabled: isPlaying
-                        
-                        background: Rectangle {
-                            color: parent.enabled ? 
-                                   (parent.pressed ? PlasmaCore.Theme.highlightColor : PlasmaCore.Theme.backgroundColor) : 
-                                   PlasmaCore.Theme.disabledTextColor
-                            radius: 4
-                            border.color: parent.enabled ? PlasmaCore.Theme.neutralTextColor : PlasmaCore.Theme.disabledTextColor
-                            border.width: 1
-                        }
-                        
-                        contentItem: Text {
-                            text: parent.text
-                            color: parent.enabled ? PlasmaCore.Theme.neutralTextColor : PlasmaCore.Theme.disabledTextColor
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                            font.pointSize: 12
-                        }
                     }
 
                     PC3.Button {
                         text: "⏭"
                         onClicked: nextStation()
                         enabled: mediaMode || stationsModel.length > 1
-                        
-                        background: Rectangle {
-                            color: parent.enabled ? 
-                                   (parent.pressed ? PlasmaCore.Theme.highlightColor : PlasmaCore.Theme.backgroundColor) : 
-                                   PlasmaCore.Theme.disabledTextColor
-                            radius: 4
-                            border.color: parent.enabled ? PlasmaCore.Theme.textColor : PlasmaCore.Theme.disabledTextColor
-                            border.width: 1
-                        }
-                        
-                        contentItem: Text {
-                            text: parent.text
-                            color: parent.enabled ? PlasmaCore.Theme.textColor : PlasmaCore.Theme.disabledTextColor
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                            font.pointSize: 12
-                        }
                     }
                 }
             }
@@ -648,7 +513,6 @@ PlasmoidItem {
                 text: "↻"
                 onClicked: refreshStations()
                 enabled: !mediaMode
-                PC3.ToolTip.text: "Refresh stations"
             }
 
             PC3.Button {
@@ -678,7 +542,7 @@ PlasmoidItem {
                     color: "#fff"
                 }
 
-                // Radio mode - song history
+                // Radio mode - song history (enhanced with real data)
                 ScrollView {
                     visible: !mediaMode
                     Layout.fillWidth: true
@@ -706,7 +570,7 @@ PlasmoidItem {
 
                             PC3.Label {
                                 text: model.station || ""
-                                color: PlasmaCore.Theme.positiveTextColor
+                                color: "#4CAF50"
                                 font.pointSize: 9
                                 Layout.preferredWidth: 100
                                 elide: Text.ElideRight
@@ -715,7 +579,7 @@ PlasmoidItem {
                     }
                 }
 
-                // Media mode - player controls
+                // Media mode - player controls (keeping Plasma 5 feature)
                 ColumnLayout {
                     visible: mediaMode
                     Layout.fillWidth: true
@@ -735,81 +599,21 @@ PlasmoidItem {
                         PC3.Button {
                             text: "⏮"
                             onClicked: prevStation()
-                            
-                            background: Rectangle {
-                                color: parent.pressed ? PlasmaCore.Theme.highlightColor : PlasmaCore.Theme.backgroundColor
-                                radius: 4
-                                border.color: PlasmaCore.Theme.textColor
-                                border.width: 1
-                            }
-                            
-                            contentItem: Text {
-                                text: parent.text
-                                color: PlasmaCore.Theme.textColor
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                font.pointSize: 12
-                            }
                         }
 
                         PC3.Button {
                             text: isPlaying ? "⏸" : "▶️"
                             onClicked: togglePlay()
-                            
-                            background: Rectangle {
-                                color: parent.pressed ? PlasmaCore.Theme.highlightColor : PlasmaCore.Theme.backgroundColor
-                                radius: 4
-                                border.color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.textColor
-                                border.width: 2
-                            }
-                            
-                            contentItem: Text {
-                                text: parent.text
-                                color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.textColor
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                font.pointSize: 14
-                            }
                         }
 
                         PC3.Button {
                             text: "⏹"
                             onClicked: stopPlayback()
-                            
-                            background: Rectangle {
-                                color: parent.pressed ? PlasmaCore.Theme.highlightColor : PlasmaCore.Theme.backgroundColor
-                                radius: 4
-                                border.color: PlasmaCore.Theme.neutralTextColor
-                                border.width: 1
-                            }
-                            
-                            contentItem: Text {
-                                text: parent.text
-                                color: PlasmaCore.Theme.neutralTextColor
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                font.pointSize: 12
-                            }
                         }
 
                         PC3.Button {
                             text: "⏭"
                             onClicked: nextStation()
-                            
-                            background: Rectangle {
-                                color: parent.pressed ? PlasmaCore.Theme.highlightColor : PlasmaCore.Theme.backgroundColor
-                                radius: 4
-                                border.color: PlasmaCore.Theme.textColor
-                                border.width: 1
-                            }
-                            
-                            contentItem: Text {
-                                text: parent.text
-                                color: PlasmaCore.Theme.textColor
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                font.pointSize: 12
-                            }
                         }
                     }
 
@@ -823,7 +627,7 @@ PlasmoidItem {
                         Rectangle {
                             width: parent.width * (mediaPosition / Math.max(1, mediaDuration))
                             height: parent.height
-                            color: PlasmaCore.Theme.positiveTextColor
+                            color: "#4CAF50"
                             radius: 3
                         }
                     }

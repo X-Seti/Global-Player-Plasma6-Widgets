@@ -1,26 +1,71 @@
-// X-Seti - Sept 15 2025 - Global Player - FRESH START - Plasma 5
+// X-Seti - Sept 15 2025 - Global Player - Proper Plasma 5 Implementation
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 import QtQuick.Controls 2.15
 import org.kde.plasma.core 2.0 as PlasmaCore
 import org.kde.plasma.components 3.0 as PC3
 import org.kde.plasma.plasmoid 2.0
+import org.kde.plasma.plasma5support 2.0 as Plasma5Support
 
 Item {
     id: root
 
-    // Basic state
-    property var stationsList: ["Heart UK", "Capital FM", "Classic FM", "Radio X", "LBC"]
-    property int currentStationIndex: 0
-    property string currentStation: stationsList[currentStationIndex] || "Heart UK"
-    property string nowPlaying: "Loading..."
-    property string artistName: ""
-    property url coverArt: ""
-    property bool isPlaying: false
-    property bool showLogging: false
-    property bool showNotifications: true
+    // Plasma 5 specific properties
+    Plasmoid.switchWidth: PlasmaCore.Units.gridUnit * 10
+    Plasmoid.switchHeight: PlasmaCore.Units.gridUnit * 10
+    Plasmoid.toolTipMainText: displayTitle
+    Plasmoid.toolTipSubText: {
+        if (playState === "Playing" && selectedStation) {
+            return "Playing on " + selectedStation
+        } else {
+            return playState
+        }
+    }
+    Plasmoid.status: isPlaying ? PlasmaCore.Types.ActiveStatus : PlasmaCore.Types.PassiveStatus
+
+    // D-Bus integrated state
+    property var stationsModel: []
+    property int stationIndex: 0
+    property string selectedStation: {
+        if (stationsModel.length === 0) return ""
+        if (stationIndex < 0 || stationIndex >= stationsModel.length) return ""
+        return stationsModel[stationIndex]
+    }
+    property string nowArtist: ""
+    property string nowTitle: ""
+    property string nowShow: ""
+    property string playState: "Stopped"
+    property bool loggingEnabled: false
+    property bool pushNotifications: false
+    property url artworkUrl: ""
+
+    // UI state (keeping Plasma 5 features)
     property bool mediaMode: false // false = radio, true = local media
+    property bool isPlaying: playState === "Playing"
     
+    // Computed properties for display
+    property string displayTitle: {
+        if (nowArtist && nowTitle) {
+            return nowArtist + " – " + nowTitle
+        } else if (nowTitle) {
+            return nowTitle
+        } else if (selectedStation) {
+            return selectedStation
+        } else {
+            return "Global Player"
+        }
+    }
+
+    property string nowPlaying: {
+        if (nowArtist && nowTitle) {
+            return nowArtist + " - " + nowTitle
+        } else if (nowTitle) {
+            return nowTitle
+        } else {
+            return "Loading..."
+        }
+    }
+
     // Song history
     property var playedSongs: []
     
@@ -30,36 +75,299 @@ Item {
     property int mediaPosition: 0
     property int mediaDuration: 0
 
-    // Simple functions
-    function togglePlay() {
-        isPlaying = !isPlaying
-        if (showNotifications) {
-            showNotification(isPlaying ? "Playing" : "Paused", currentStation)
+    // Song history model
+    ListModel {
+        id: playedSongsModel
+    }
+
+    // Poll metadata timer
+    Timer {
+        id: pollTimer
+        interval: 10000
+        running: true
+        repeat: true
+        onTriggered: {
+            getNowPlaying()
         }
-        console.log("Toggle play:", isPlaying, currentStation)
+    }
+
+    // D-Bus Data Source
+    Plasma5Support.DataSource {
+        id: execDS
+        engine: "executable"
+
+        onNewData: function(sourceName, data) {
+            var out = (data["stdout"] || "").trim()
+            var err = (data["stderr"] || "").trim()
+
+            if (err) {
+                console.log("Command error:", err)
+            }
+
+            if (sourceName.indexOf("GetNowPlaying") !== -1) {
+                try {
+                    var m = JSON.parse(out)
+                    nowArtist = m.artist || ""
+                    nowTitle = m.title || ""
+                    nowShow = m.show || ""
+                    playState = m.state || playState
+                    if (m.artworkPath) {
+                        artworkUrl = "file://" + m.artworkPath
+                    } else {
+                        artworkUrl = ""
+                    }
+
+                    // Add to history when in radio mode
+                    if (!mediaMode && (nowArtist || nowTitle)) {
+                        addToHistory(nowTitle, nowArtist)
+                        // Show notification for new songs
+                        if (nowArtist && nowTitle) {
+                            showNotification("Now Playing", nowArtist + " - " + nowTitle)
+                        }
+                    }
+
+                } catch (e) {
+                    console.log("Error parsing GetNowPlaying:", e)
+                }
+            } else if (sourceName.indexOf("GetState") !== -1) {
+                try {
+                    var s = JSON.parse(out)
+                    playState = s.state || playState
+                    loggingEnabled = s.logging === true
+                    pushNotifications = s.notifications === true
+                    var st = s.station || ""
+                    if (st.length > 0 && stationsModel.indexOf(st) >= 0) {
+                        stationIndex = stationsModel.indexOf(st)
+                    }
+                } catch (e) {
+                    console.log("Error parsing GetState:", e)
+                }
+            } else if (sourceName.indexOf("GetStations") !== -1) {
+                try {
+                    var arr = JSON.parse(out)
+                    stationsModel = arr
+                    if (arr.length > 0 && stationIndex >= arr.length) {
+                        stationIndex = 0
+                    }
+                } catch (e) {
+                    console.log("Error parsing GetStations:", e)
+                }
+            }
+            disconnectSource(sourceName)
+        }
+    }
+
+    // Notification system
+    function showNotification(title, message, timeout) {
+        if (pushNotifications) {
+            // Create a simple visual notification
+            notificationTimer.title = title
+            notificationTimer.message = message
+            //notify-send = title needs to be added
+            //notify-send = message needs to be added
+            notificationTimer.restart()
+
+        }
+    }
+
+    Timer {
+        id: notificationTimer
+        interval: 3000
+        property string title: ""
+        property string message: ""
+        onTriggered: {
+            // Reset notification
+            title = ""
+            message = ""
+        }
+    }
+
+    // Visual notification overlay
+    Rectangle {
+        id: notificationOverlay
+        visible: notificationTimer.running && notificationTimer.title !== ""
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.topMargin: PlasmaCore.Units.smallSpacing
+        width: childrenRect.width + PlasmaCore.Units.largeSpacing
+        height: childrenRect.height + PlasmaCore.Units.smallSpacing
+        color: PlasmaCore.Theme.backgroundColor
+        border.color: PlasmaCore.Theme.highlightColor
+        border.width: 2
+        radius: PlasmaCore.Units.smallSpacing
+        opacity: 0.95
+        z: 1000
+
+        ColumnLayout {
+            anchors.centerIn: parent
+            spacing: PlasmaCore.Units.smallSpacing / 2
+
+            PC3.Label {
+                text: notificationTimer.title
+                font.bold: true
+                font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 0.9
+                Layout.alignment: Qt.AlignHCenter
+            }
+
+            PC3.Label {
+                text: notificationTimer.message
+                font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                Layout.alignment: Qt.AlignHCenter
+                visible: notificationTimer.message !== ""
+            }
+        }
+    }
+
+    // D-Bus helper functions
+    function qdbusCall(method, args) {
+        var cmd = "qdbus org.mooheda.gpd /org/mooheda/gpd org.mooheda.gpd1." + method
+        if (args && args.length > 0) {
+            for (var i = 0; i < args.length; ++i) {
+                var a = ("" + args[i]).replace(/\"/g, "\\\"")
+                cmd += " \"" + a + "\""
+            }
+        }
+        execDS.connectSource(cmd)
+    }
+
+    function getNowPlaying() {
+        if (!mediaMode) {
+            qdbusCall("GetNowPlaying", [])
+        }
+    }
+
+    function getState() {
+        qdbusCall("GetState", [])
+    }
+
+    function refreshStations() {
+        qdbusCall("GetStations", [])
+    }
+
+    function signIn() {
+        qdbusCall("SignIn", [])
+    }
+
+    // Control functions
+    function togglePlay() {
+        if (mediaMode) {
+            // Local media mode
+            isPlaying = !isPlaying
+            showNotification("Media Player", isPlaying ? "Playing" : "Paused")
+            console.log("Media:", isPlaying ? "Playing" : "Paused")
+        } else {
+            // Radio mode - use D-Bus
+            if (isPlaying) {
+                qdbusCall("Pause", [])
+                showNotification("Global Player", "Paused")
+            } else {
+                playCurrent()
+            }
+        }
+    }
+
+    function playCurrent() {
+        if (mediaMode) {
+            // Media mode
+            playState = "Playing"
+            showNotification("Media Player", "Playing media file")
+            console.log("Playing media file")
+        } else {
+            // Radio mode
+            if (stationsModel.length === 0) return
+            if (stationIndex < 0 || stationIndex >= stationsModel.length) {
+                stationIndex = 0
+            }
+            selectedStation = stationsModel[stationIndex]
+            qdbusCall("Play", [selectedStation])
+            showNotification("Global Player", "Playing: " + selectedStation)
+            if (!pollTimer.running) {
+                pollTimer.start()
+            }
+            getState()
+            getNowPlaying()
+        }
+    }
+
+    function stopPlayback() {
+        if (mediaMode) {
+            playState = "Stopped"
+            showNotification("Media Player", "Stopped")
+            console.log("Stopped media playback")
+        } else {
+            // For radio, pause is effectively stop
+            qdbusCall("Pause", [])
+            showNotification("Global Player", "Stopped")
+        }
     }
 
     function nextStation() {
-        currentStationIndex = (currentStationIndex + 1) % stationsList.length
-        currentStation = stationsList[currentStationIndex]
-        if (showNotifications) {
-            showNotification("Station Changed", currentStation)
+        if (mediaMode) {
+            // Media mode - next track
+            mediaIndex = (mediaIndex + 1) % Math.max(1, mediaPlaylist.length)
+            showNotification("Media Player", "Next track")
+            console.log("Next media track")
+        } else {
+            // Radio mode
+            if (stationsModel.length === 0) return
+            stationIndex = (stationIndex + 1) % stationsModel.length
+            var nextStationName = stationsModel[stationIndex]
+            showNotification("Station Changed", nextStationName)
+            playCurrent()
         }
-        console.log("Next station:", currentStation)
     }
 
-    function showNotification(title, text) {
-        // Simple KDE notification
-        dataSource.connectSource("kdialog --title '" + title + "' --passivepopup '" + text + "' 3")
+    function prevStation() {
+        if (mediaMode) {
+            // Media mode - previous track
+            mediaIndex = (mediaIndex - 1 + Math.max(1, mediaPlaylist.length)) % Math.max(1, mediaPlaylist.length)
+            showNotification("Media Player", "Previous track")
+            console.log("Previous media track")
+        } else {
+            // Radio mode
+            if (stationsModel.length === 0) return
+            stationIndex = (stationIndex - 1 + stationsModel.length) % stationsModel.length
+            var prevStationName = stationsModel[stationIndex]
+            showNotification("Station Changed", prevStationName)
+            playCurrent()
+        }
     }
 
+    function switchMode() {
+        mediaMode = !mediaMode
+        var newMode = mediaMode ? "Media Player" : "Radio"
+        showNotification("Mode Changed", newMode + " mode activated")
+        console.log("Switched to", newMode, "mode")
+        
+        if (mediaMode) {
+            // Entering media mode - pause radio
+            if (playState === "Playing") {
+                qdbusCall("Pause", [])
+            }
+        } else {
+            // Entering radio mode - refresh stations
+            refreshStations()
+            getState()
+        }
+    }
+
+    // History management
     function addToHistory(song, artist) {
         var newSong = {
             "time": new Date().toLocaleTimeString(),
-            "song": song,
-            "artist": artist,
-            "station": currentStation
+            "song": song || "Unknown Song",
+            "artist": artist || "Unknown Artist", 
+            "station": mediaMode ? "Local Media" : selectedStation
         }
+        
+        // Avoid duplicates
+        if (playedSongs.length > 0) {
+            var last = playedSongs[0]
+            if (last.song === newSong.song && last.artist === newSong.artist) {
+                return // Skip duplicate
+            }
+        }
+        
         playedSongs.unshift(newSong)
         if (playedSongs.length > 10) {
             playedSongs.pop()
@@ -70,319 +378,374 @@ Item {
         }
     }
 
-    function switchMode() {
-        mediaMode = !mediaMode
-        console.log("Switched to", mediaMode ? "Media Player" : "Radio", "mode")
-    }
-
-    // Data source for commands
-    PlasmaCore.DataSource {
-        id: dataSource
-        engine: "executable"
-    }
-
-    // Song history model
-    ListModel {
-        id: playedSongsModel
-    }
-
-    // Startup
+    // Component initialization
     Component.onCompleted: {
-        console.log("Global Player started - Fresh version")
+        console.log("Global Player Plasma 5 started with D-Bus integration")
+        refreshStations()
+        getState()
+        pollTimer.start()
         addToHistory("Welcome to Global Player", "System")
     }
 
-    // Update timer
-    Timer {
-        interval: 5000
-        running: true
-        repeat: true
-        onTriggered: {
-            // Simulate song updates
-            if (isPlaying && !mediaMode) {
-                var songs = ["Amazing Song", "Great Track", "Awesome Hit", "Perfect Tune"]
-                var artists = ["Cool Artist", "Great Band", "Super Singer", "Mega Star"]
-                nowPlaying = songs[Math.floor(Math.random() * songs.length)]
-                artistName = artists[Math.floor(Math.random() * artists.length)]
-                addToHistory(nowPlaying, artistName)
+    // Plasma 5 Compact Representation (Panel Mode)
+    Plasmoid.compactRepresentation: Item {
+        id: compactRoot
+        
+        // Proper sizing for Plasma 5
+        implicitWidth: PlasmaCore.Units.iconSizes.small
+        implicitHeight: PlasmaCore.Units.iconSizes.small
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: 1
+            radius: 3
+            color: PlasmaCore.Theme.backgroundColor
+            border.color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.textColor
+            border.width: 1
+
+            Image {
+                anchors.fill: parent
+                anchors.margins: 3
+                fillMode: Image.PreserveAspectFit
+                source: artworkUrl
+                visible: artworkUrl !== ""
+            }
+
+            PlasmaCore.IconItem {
+                anchors.centerIn: parent
+                width: parent.width * 0.6
+                height: parent.height * 0.6
+                source: mediaMode ? "audio-mp3" : "audio-radio"
+                visible: artworkUrl === ""
+            }
+
+            // Playing indicator
+            Rectangle {
+                anchors.bottom: parent.bottom
+                anchors.right: parent.right
+                anchors.margins: 1
+                width: 6
+                height: 6
+                radius: 3
+                color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.neutralTextColor
+                opacity: 0.9
             }
         }
-    }
 
-    // PANEL MODE - Just the cover art icon
-    Rectangle {
-        visible: plasmoid.formFactor === PlasmaCore.Types.Horizontal || plasmoid.formFactor === PlasmaCore.Types.Vertical
-        anchors.fill: parent
-        anchors.margins: 2
-        radius: 4
-        color: "#2a2a2a"
-        border.color: isPlaying ? "#4CAF50" : "#666"
-        border.width: 2
-
-        // Cover art or music note
-        Image {
-            anchors.fill: parent
-            anchors.margins: 4
-            source: coverArt
-            fillMode: Image.PreserveAspectFit
-            visible: coverArt !== ""
-        }
-
-        PC3.Label {
-            anchors.centerIn: parent
-            text: "♪"
-            font.pointSize: 16
-            color: "#fff"
-            visible: coverArt === ""
-        }
-
-        // Click handlers
         MouseArea {
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton | Qt.RightButton
-            
             onClicked: function(mouse) {
                 if (mouse.button === Qt.LeftButton) {
-                    togglePlay()
+                    togglePlay() // LEFT CLICK = PLAY/PAUSE
                 } else if (mouse.button === Qt.RightButton) {
-                    nextStation()
+                    nextStation() // RIGHT CLICK = NEXT STATION
                 }
+            }
+            onPressAndHold: {
+                plasmoid.expanded = !plasmoid.expanded // LONG PRESS = OPEN POPUP
             }
         }
     }
 
-    // DESKTOP MODE - Full interface
-    ColumnLayout {
-        visible: !(plasmoid.formFactor === PlasmaCore.Types.Horizontal || plasmoid.formFactor === PlasmaCore.Types.Vertical)
-        anchors.fill: parent
-        anchors.margins: 16
-        spacing: 12
+    // Plasma 5 Full Representation (Popup Mode)
+    Plasmoid.fullRepresentation: Item {
+        id: fullRoot
+        
+        implicitWidth: PlasmaCore.Units.gridUnit * 20
+        implicitHeight: PlasmaCore.Units.gridUnit * 15
 
-        // Top section - Cover art and station info
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 16
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: PlasmaCore.Units.smallSpacing
+            spacing: PlasmaCore.Units.smallSpacing
 
-            // Cover art (left side)
-            Rectangle {
-                Layout.preferredWidth: 120
-                Layout.preferredHeight: 120
-                radius: 8
-                color: "#2a2a2a"
-                border.color: isPlaying ? "#4CAF50" : "#666"
-                border.width: 2
-
-                Image {
-                    anchors.fill: parent
-                    anchors.margins: 8
-                    source: coverArt
-                    fillMode: Image.PreserveAspectFit
-                    visible: coverArt !== ""
-                }
-
-                PC3.Label {
-                    anchors.centerIn: parent
-                    text: "♪"
-                    font.pointSize: 32
-                    color: "#fff"
-                    visible: coverArt === ""
-                }
-            }
-
-            // Station info and controls
-            ColumnLayout {
+            // Top section - Cover art and station info
+            RowLayout {
                 Layout.fillWidth: true
-                spacing: 8
+                spacing: PlasmaCore.Units.largeSpacing
 
-                // Station name and controls
-                RowLayout {
-                    Layout.fillWidth: true
+                // Cover art (left side)
+                Rectangle {
+                    Layout.preferredWidth: PlasmaCore.Units.gridUnit * 5
+                    Layout.preferredHeight: PlasmaCore.Units.gridUnit * 5
+                    radius: PlasmaCore.Units.smallSpacing
+                    color: PlasmaCore.Theme.backgroundColor
+                    border.color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.textColor
+                    border.width: 2
 
-                    PC3.Button {
-                        text: "◀"
-                        onClicked: prevStation()
-                        enabled: stationsList.length > 1
+                    Image {
+                        anchors.fill: parent
+                        anchors.margins: PlasmaCore.Units.smallSpacing
+                        source: artworkUrl
+                        fillMode: Image.PreserveAspectFit
+                        visible: artworkUrl !== ""
                     }
 
-                    PC3.Label {
-                        text: mediaMode ? "Media Player" : currentStation
-                        font.bold: true
-                        font.pointSize: 16
-                        Layout.fillWidth: true
-                        horizontalAlignment: Text.AlignHCenter
-                    }
-
-                    PC3.Button {
-                        text: "▶"
-                        onClicked: nextStation()
-                        enabled: stationsList.length > 1
-                    }
-                }
-
-                // Now playing info
-                PC3.Label {
-                    Layout.fillWidth: true
-                    text: mediaMode ? "Local Media Playback" : (artistName + " - " + nowPlaying)
-                    font.pointSize: 12
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.WordWrap
-                }
-            }
-        }
-
-        // Options row
-        RowLayout {
-            Layout.fillWidth: true
-
-            PC3.CheckBox {
-                text: "Logging"
-                checked: showLogging
-                onToggled: showLogging = checked
-            }
-
-            PC3.CheckBox {
-                text: "Notifications"
-                checked: showNotifications
-                onToggled: showNotifications = checked
-            }
-
-            Item { Layout.fillWidth: true }
-
-            PC3.Button {
-                text: mediaMode ? "Radio Mode" : "Media Mode"
-                onClicked: switchMode()
-            }
-        }
-
-        // Song history / Media player area
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            Layout.minimumHeight: 200
-            color: "#1a1a1a"
-            radius: 8
-            border.color: "#444"
-            border.width: 1
-
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 12
-
-                PC3.Label {
-                    text: mediaMode ? "Media Player Controls" : "Recently Played Songs"
-                    font.bold: true
-                    color: "#fff"
-                }
-
-                // Radio mode - song history
-                ScrollView {
-                    visible: !mediaMode
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-
-                    ListView {
-                        model: playedSongsModel
-                        delegate: RowLayout {
-                            width: ListView.view.width
-                            spacing: 8
-
-                            PC3.Label {
-                                text: model.time || ""
-                                color: "#888"
-                                font.pointSize: 9
-                                Layout.preferredWidth: 60
-                            }
-
-                            PC3.Label {
-                                text: (model.artist || "") + " - " + (model.song || "")
-                                color: "#fff"
-                                Layout.fillWidth: true
-                                elide: Text.ElideRight
-                            }
-
-                            PC3.Label {
-                                text: model.station || ""
-                                color: "#4CAF50"
-                                font.pointSize: 9
-                                Layout.preferredWidth: 80
-                            }
-                        }
+                    PlasmaCore.IconItem {
+                        anchors.centerIn: parent
+                        width: parent.width * 0.6
+                        height: parent.height * 0.6
+                        source: mediaMode ? "audio-mp3" : "audio-radio"
+                        visible: artworkUrl === ""
                     }
                 }
 
-                // Media mode - player controls
+                // Station info and controls
                 ColumnLayout {
-                    visible: mediaMode
                     Layout.fillWidth: true
-                    Layout.fillHeight: true
+                    spacing: PlasmaCore.Units.smallSpacing
 
+                    // Line 1: Station name (centered)
                     PC3.Label {
-                        text: "Local MP3/MP4 Player"
-                        color: "#fff"
-                        horizontalAlignment: Text.AlignHCenter
+                        text: mediaMode ? "Media Player" : (selectedStation || "Loading...")
+                        font.bold: true
+                        font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 1.2
                         Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap
                     }
 
+                    // Line 2: Now playing / Song info (centered)
+                    PC3.Label {
+                        Layout.fillWidth: true
+                        text: mediaMode ? "Local Media Playback" : nowPlaying
+                        font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 0.9
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap
+                        maximumLineCount: 2
+                        elide: Text.ElideRight
+                    }
+
+                    // Line 3: Playback controls (centered) - THEME AWARE COLORS
                     RowLayout {
                         Layout.fillWidth: true
                         Layout.alignment: Qt.AlignHCenter
+                        spacing: PlasmaCore.Units.smallSpacing
 
                         PC3.Button {
                             text: "⏮"
-                            onClicked: console.log("Previous track")
+                            onClicked: prevStation()
+                            enabled: mediaMode || stationsModel.length > 1
+                            
+                            // Simplified styling to avoid ColorOverlay issues
+                            flat: false
+                            highlighted: parent.enabled && parent.pressed
                         }
 
                         PC3.Button {
                             text: isPlaying ? "⏸" : "▶️"
                             onClicked: togglePlay()
+                            
+                            // Simplified styling to avoid ColorOverlay issues  
+                            flat: false
+                            highlighted: isPlaying
+                        }
+
+                        PC3.Button {
+                            text: "⏹"
+                            onClicked: stopPlayback()
+                            enabled: isPlaying
+                            
+                            // Simplified styling to avoid ColorOverlay issues
+                            flat: false
+                            highlighted: parent.enabled && parent.pressed
                         }
 
                         PC3.Button {
                             text: "⏭"
-                            onClicked: console.log("Next track")
+                            onClicked: nextStation()
+                            enabled: mediaMode || stationsModel.length > 1
+                            
+                            // Simplified styling to avoid ColorOverlay issues
+                            flat: false
+                            highlighted: parent.enabled && parent.pressed
                         }
                     }
+                }
+            }
 
-                    // Progress bar placeholder
-                    Rectangle {
-                        Layout.fillWidth: true
-                        height: 6
-                        color: "#333"
-                        radius: 3
+            // Options row
+            RowLayout {
+                Layout.fillWidth: true
 
-                        Rectangle {
-                            width: parent.width * 0.3
-                            height: parent.height
-                            color: "#4CAF50"
-                            radius: 3
-                        }
-                    }
+                PC3.CheckBox {
+                    text: "Logging"
+                    checked: loggingEnabled
+                    onToggled: qdbusCall("SetLogging", [checked ? "true" : "false"])
+                }
 
-                    RowLayout {
-                        Layout.fillWidth: true
+                PC3.CheckBox {
+                    text: "Notifications"
+                    checked: pushNotifications
+                    onToggled: qdbusCall("SetNotifications", [checked ? "true" : "false"])
+                }
 
-                        PC3.Label {
-                            text: "2:34"
-                            color: "#888"
-                            font.pointSize: 9
-                        }
+                Item { Layout.fillWidth: true }
 
-                        Item { Layout.fillWidth: true }
+                PC3.Button {
+                    text: mediaMode ? "Radio Mode" : "Media Mode"
+                    onClicked: switchMode()
+                }
 
-                        PC3.Label {
-                            text: "4:12"
-                            color: "#888"
-                            font.pointSize: 9
-                        }
-                    }
+                PC3.Button {
+                    text: "↻"
+                    onClicked: refreshStations()
+                    enabled: !mediaMode
+                }
+
+                PC3.Button {
+                    text: "Sign In"
+                    onClicked: signIn()
+                    enabled: !mediaMode
+                }
+            }
+
+            // Song history / Media player area
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                color: PlasmaCore.Theme.backgroundColor
+                radius: PlasmaCore.Units.smallSpacing
+                border.color: PlasmaCore.Theme.textColor
+                border.width: 1
+                opacity: 0.8
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: PlasmaCore.Units.smallSpacing
 
                     PC3.Label {
-                        text: "Ready for your media files..."
-                        color: "#666"
-                        horizontalAlignment: Text.AlignHCenter
+                        text: mediaMode ? "Media Player Controls" : "Recently Played Songs"
+                        font.bold: true
+                    }
+
+                    // Radio mode - song history
+                    ScrollView {
+                        visible: !mediaMode
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        verticalAlignment: Text.AlignVCenter
+
+                        ListView {
+                            model: playedSongsModel
+                            delegate: RowLayout {
+                                width: ListView.view ? ListView.view.width : 0
+                                spacing: PlasmaCore.Units.smallSpacing
+
+                                PC3.Label {
+                                    text: model.time || ""
+                                    opacity: 0.7
+                                    font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                                    Layout.preferredWidth: PlasmaCore.Units.gridUnit * 2
+                                }
+
+                                PC3.Label {
+                                    text: (model.artist || "") + " - " + (model.song || "")
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
+                                    font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                                }
+
+                                PC3.Label {
+                                    text: model.station || ""
+                                    color: PlasmaCore.Theme.positiveTextColor
+                                    font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                                    Layout.preferredWidth: PlasmaCore.Units.gridUnit * 3
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+                    }
+
+                    // Media mode - player controls
+                    ColumnLayout {
+                        visible: mediaMode
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+
+                        PC3.Label {
+                            text: "Local MP3/MP4 Player"
+                            horizontalAlignment: Text.AlignHCenter
+                            Layout.fillWidth: true
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.alignment: Qt.AlignHCenter
+
+                            PC3.Button {
+                                text: "⏮"
+                                onClicked: prevStation()
+                                flat: false
+                            }
+
+                            PC3.Button {
+                                text: isPlaying ? "⏸" : "▶️"
+                                onClicked: togglePlay()
+                                flat: false
+                                highlighted: isPlaying
+                            }
+
+                            PC3.Button {
+                                text: "⏹"
+                                onClicked: stopPlayback()
+                                flat: false
+                            }
+
+                            PC3.Button {
+                                text: "⏭"
+                                onClicked: nextStation()
+                                flat: false
+                            }
+                        }
+
+                        // Progress bar
+                        Rectangle {
+                            Layout.fillWidth: true
+                            height: PlasmaCore.Units.smallSpacing
+                            color: PlasmaCore.Theme.backgroundColor
+                            radius: PlasmaCore.Units.smallSpacing / 2
+                            border.color: PlasmaCore.Theme.textColor
+                            border.width: 1
+
+                            Rectangle {
+                                width: parent.width * (mediaPosition / Math.max(1, mediaDuration))
+                                height: parent.height - 2
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.left: parent.left
+                                anchors.leftMargin: 1
+                                color: PlasmaCore.Theme.positiveTextColor
+                                radius: parent.radius
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+
+                            PC3.Label {
+                                text: Math.floor(mediaPosition / 60) + ":" + String(mediaPosition % 60).padStart(2, '0')
+                                opacity: 0.7
+                                font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                            }
+
+                            Item { Layout.fillWidth: true }
+
+                            PC3.Label {
+                                text: Math.floor(mediaDuration / 60) + ":" + String(mediaDuration % 60).padStart(2, '0')
+                                opacity: 0.7
+                                font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                            }
+                        }
+
+                        PC3.Label {
+                            text: mediaMode ? "Ready for your media files..." : ""
+                            opacity: 0.5
+                            horizontalAlignment: Text.AlignHCenter
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            verticalAlignment: Text.AlignVCenter
+                            visible: mediaMode
+                        }
                     }
                 }
             }
