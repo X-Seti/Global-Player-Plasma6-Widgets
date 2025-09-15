@@ -1,6 +1,6 @@
 # Global Player Plasma 6 Widget - X-Seti - Sept 14 2025
 
-A KDE Plasma 6 widget for listening to Global Player radio stations.
+A KDE Plasma 5/6 widget for listening to Global Player radio stations.
 
 ## Features
 - Listen to Global Player stations (Heart, Capital, Classic FM, etc.)
@@ -28,7 +28,8 @@ A KDE Plasma 6 widget for listening to Global Player radio stations.
    ```bash
    chmod +x install.sh
    ./install.sh
-   ```
+
+   Pick your station (country)
 
 3. Add the widget:
    - Right-click on panel or desktop
