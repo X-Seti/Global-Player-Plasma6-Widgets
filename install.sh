@@ -1,85 +1,85 @@
 #!/usr/bin/env bash
-# Simple Global Player installer - just copy QML and restart Plasma
+# X-Seti - Sept 15 2025 - GlobalPlayer 3.2.2 - Fixed Plasma 5 Support
 set -euo pipefail
 
-PLASMOID_DST="${HOME}/.local/share/plasma/plasmoids/org.mooheda.globalplayer"
+PLASMOID_ID="org.mooheda.globalplayer"
+PLASMOID_SRC="$(dirname "$0")/${PLASMOID_ID}"
+PLASMOID_DST="${HOME}/.local/share/plasma/plasmoids/${PLASMOID_ID}"
 
-echo "=== Simple Global Player Installer ==="
+DAEMON_SRC="$(dirname "$0")/globalplayer-daemon"
+DAEMON_DST="${HOME}/globalplayer-daemon"
 
 # Detect Plasma version
+PLASMA_VERSION=""
 if command -v kquitapp6 >/dev/null 2>&1; then
     PLASMA_VERSION="6"
 elif command -v kquitapp5 >/dev/null 2>&1; then
     PLASMA_VERSION="5"
 else
-    PLASMA_VERSION="5"  # Default to 5
+    echo "Warning: Could not detect Plasma version. Checking for plasmashell..."
+    if command -v plasmashell >/dev/null 2>&1; then
+        # Try to determine version from plasmashell
+        PLASMA_VERSION="5"  # Default to 5 if uncertain
+    else
+        echo "Error: No Plasma installation detected!"
+        exit 1
+    fi
 fi
 
 echo "[+] Detected Plasma ${PLASMA_VERSION}"
 
-# Create directory structure
-mkdir -p "${PLASMOID_DST}/contents/ui"
-
-# Copy the right QML file
+echo "[+] Installing dependencies (you may need sudo):"
 if [ "$PLASMA_VERSION" = "6" ]; then
-    echo "[+] Copying plasma6_main_qml → main.qml"
-    if [ -f "plasma6_main_qml" ]; then
-        cp "plasma6_main_qml" "${PLASMOID_DST}/contents/ui/main.qml"
-        echo "    ✓ Copied $(wc -l < plasma6_main_qml) lines"
-    else
-        echo "    ✗ plasma6_main_qml not found!"
-        exit 1
-    fi
+    echo "    Debian/Ubuntu: sudo apt install mpv qdbus python3-dbus python3-gi python3-requests python3-pyqt6.qtwebengine"
+    echo "    Arch:          sudo pacman -S mpv qt6-tools python-dbus python-gobject python-requests python-pyqt6-webengine"
+    echo "    Fedora:        sudo dnf install mpv qt6-qttools python3-dbus python3-gobject python3-requests python3-pyqt6-webengine"
 else
-    echo "[+] Copying plasma5_main_qml → main.qml"
-    if [ -f "plasma5_main_qml" ]; then
-        cp "plasma5_main_qml" "${PLASMOID_DST}/contents/ui/main.qml"
-        echo "    ✓ Copied $(wc -l < plasma5_main_qml) lines"
-    else
-        echo "    ✗ plasma5_main_qml not found!"
-        exit 1
-    fi
+    echo "    Debian/Ubuntu: sudo apt install mpv qdbus python3-dbus python3-gi python3-requests python3-pyqt5.qtwebengine"
+    echo "    Arch:          sudo pacman -S mpv qt5-tools python-dbus python-gobject python-requests python-pyqt5-webengine"  
+    echo "    Fedora:        sudo dnf install mpv qt5-qttools python3-dbus python3-gobject python3-requests python3-pyqt5-webengine"
 fi
 
-# Copy metadata
+echo "[+] Installing plasmoid to ${PLASMOID_DST}"
+mkdir -p "${PLASMOID_DST}"
+
+# Copy the entire plasmoid directory structure
+#if [ -d "${PLASMOID_SRC}" ]; then
+#    rsync -a --delete "${PLASMOID_SRC}/" "${PLASMOID_DST}/"
+#else
+#    echo "Error: Plasmoid source directory ${PLASMOID_SRC} not found!"
+#    echo "Creating directory structure and files..."
+#    mkdir -p "${PLASMOID_DST}/contents/ui"
+#fi
+
+# Use appropriate QML file based on Plasma version
 if [ "$PLASMA_VERSION" = "6" ]; then
-    if [ -f "org.mooheda.globalplayer/v6/metadata.json" ]; then
-        echo "[+] Copying v6 metadata.json"
-        cp "org.mooheda.globalplayer/v6/metadata.json" "${PLASMOID_DST}/metadata.json"
-    elif [ -f "org.mooheda.globalplayer/v6/metadata.desktop" ]; then
-        echo "[+] Copying v6 metadata.desktop"
-        cp "org.mooheda.globalplayer/v6/metadata.desktop" "${PLASMOID_DST}/metadata.desktop"
-    fi
-else
-    if [ -f "org.mooheda.globalplayer/v5/metadata.desktop" ]; then
-        echo "[+] Copying v5 metadata.desktop"
-        cp "org.mooheda.globalplayer/v5/metadata.desktop" "${PLASMOID_DST}/metadata.desktop"
+    if [ -f "$(dirname "$0")/main-plasma6.qml" ]; then
+        echo "[+] Using Plasma 6 version of main.qml"
+        cp "$(dirname "$0")/main-plasma6.qml" "${PLASMOID_DST}/contents/ui/main.qml"
     fi
 fi
 
-# Clear Plasma cache
-echo "[+] Clearing Plasma cache"
-rm -rf ~/.cache/plasma* ~/.cache/plasmashell ~/.cache/krunner 2>/dev/null || true
-
-# Restart Plasma
-echo "[+] Restarting Plasma"
-if systemctl --user is-active plasma-plasmashell.service >/dev/null 2>&1; then
-    systemctl --user restart plasma-plasmashell.service
-elif command -v kquitapp6 >/dev/null 2>&1; then
-    kquitapp6 plasmashell || true
-    sleep 2
-    nohup plasmashell > /dev/null 2>&1 &
-else
-    pkill plasmashell 2>/dev/null || true
-    sleep 2
-    nohup plasmashell > /dev/null 2>&1 &
+if [ "$PLASMA_VERSION" = "5" ]; then
+    if [ -f "$(dirname "$0")/main-plasma5.qml" ]; then
+        echo "[+] Using Plasma 5 version of main.qml"
+        cp "$(dirname "$0")/main-plasma5.qml" "${PLASMOID_DST}/contents/ui/main.qml"
+    fi
 fi
 
-echo ""
-echo "✅ Simple install complete!"
-echo "📁 Installed to: ${PLASMOID_DST}"
-echo "🔧 Plasma ${PLASMA_VERSION} cache cleared and restarted"
-echo ""
-echo "📋 Next steps:"
-echo "   1. Add widget: Right-click panel → Add Widgets → Search 'Global Player'"
-echo "   2. Check console: journalctl --user -f | grep -i 'global'"
+echo "[+] Installing systemd --user service"
+mkdir -p "${HOME}/.config/systemd/user"
+cp "$(dirname "$0")/gpd.service" "${HOME}/.config/systemd/user/gpd.service"
+systemctl --user daemon-reload || true
+systemctl --user enable --now gpd.service || true
+
+echo "[+] Restarting Plasma (optional, if the widget doesn't refresh)"
+if command -v kquitapp6 >/dev/null 2>&1; then
+  kquitapp6 plasmashell || true
+  (sleep 1; kstart6 plasmashell)&
+elif command -v kquitapp5 >/dev/null 2>&1; then
+  kquitapp5 plasmashell || true
+  (sleep 1; kstart5 plasmashell)&
+fi
+
+echo "[+] Done. Add/refresh the widget: 'Global Player v3.2'"
+

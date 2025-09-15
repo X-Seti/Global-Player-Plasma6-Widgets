@@ -234,10 +234,4 @@ case $choice in
         ;;
 esac
 
-echo ""
-echo "✨ Done! Check the created package directories."
-echo ""
-echo "🎯 Quick Start:"
-echo "   cd [Package-Directory]"
-echo "   ./install.sh"
-echo "   Right-click panel → Add Widgets → Search for your regional player"
+

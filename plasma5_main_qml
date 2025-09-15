@@ -1,4 +1,4 @@
-// X-Seti - Sept 15 2025 - GlobalPlayer - Plasma 5 Clean Version
+// X-Seti - Sept 15 2025 - Global Player - FRESH START - Plasma 5
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 import QtQuick.Controls 2.15
@@ -9,468 +9,382 @@ import org.kde.plasma.plasmoid 2.0
 Item {
     id: root
 
-    // Version information (console only, no popups)
-    readonly property string widgetVersion: "3.2.2"
-    readonly property string plasmaVersionDetected: "Plasma 5"
-
-    Plasmoid.toolTipMainText: ""
-    Plasmoid.toolTipSubText: ""
-    Plasmoid.status: isPlaying ? PlasmaCore.Types.ActiveStatus : PlasmaCore.Types.PassiveStatus
+    // Basic state
+    property var stationsList: ["Heart UK", "Capital FM", "Classic FM", "Radio X", "LBC"]
+    property int currentStationIndex: 0
+    property string currentStation: stationsList[currentStationIndex] || "Heart UK"
+    property string nowPlaying: "Loading..."
+    property string artistName: ""
+    property url coverArt: ""
+    property bool isPlaying: false
+    property bool showLogging: false
+    property bool showNotifications: true
+    property bool mediaMode: false // false = radio, true = local media
     
-    property var stationsModel: []
-    property int stationIndex: 0
-    property string selectedStation: {
-        if (stationsModel.length === 0) return ""
-        if (stationIndex < 0 || stationIndex >= stationsModel.length) return ""
-        return stationsModel[stationIndex]
-    }
-    property string nowArtist: ""
-    property string nowTitle: ""
-    property string nowShow: ""
-    property string playState: "Stopped"
-    property bool loggingEnabled: false
-    property bool pushNotifications: false
-    property url artworkUrl: ""
-    property string lastNotifiedTrack: ""
+    // Song history
+    property var playedSongs: []
+    
+    // Media player state
+    property var mediaPlaylist: []
+    property int mediaIndex: 0
+    property int mediaPosition: 0
+    property int mediaDuration: 0
 
-    property string displayTitle: {
-        if (nowArtist && nowTitle) {
-            return nowArtist + " — " + nowTitle
-        } else if (nowTitle) {
-            return nowTitle
-        } else if (selectedStation) {
-            return selectedStation
-        } else {
-            return "Global Player"
+    // Simple functions
+    function togglePlay() {
+        isPlaying = !isPlaying
+        if (showNotifications) {
+            showNotification(isPlaying ? "Playing" : "Paused", currentStation)
         }
-    }
-
-    property bool isPlaying: playState === "Playing"
-
-    Plasmoid.switchWidth: PlasmaCore.Units.gridUnit * 20
-    Plasmoid.switchHeight: PlasmaCore.Units.gridUnit * 25
-
-    // Console-only logging (no popups)
-    function logError(context, error) {
-        console.log("GlobalPlayer Error in " + context + ": " + error.toString())
-    }
-
-    function sendTrackNotification() {
-        try {
-            var trackInfo = displayTitle
-            if (trackInfo && trackInfo !== "Global Player" && trackInfo !== lastNotifiedTrack) {
-                lastNotifiedTrack = trackInfo
-                // Simple notification without version spam
-                execDS.connectSource("kdialog --title 'Global Player' --passivepopup '" + trackInfo + "' 3")
-            }
-        } catch (e) {
-            logError("sendTrackNotification", e)
-        }
-    }
-
-    function qdbusCall(method, args) {
-        try {
-            var cmd = "qdbus org.mooheda.gpd /org/mooheda/gpd org.mooheda.gpd." + method
-            if (args && args.length > 0) {
-                cmd += " " + args.join(" ")
-            }
-            execDS.connectSource(cmd)
-        } catch (e) {
-            logError("qdbusCall(" + method + ")", e)
-        }
-    }
-
-    function refreshStations() {
-        try {
-            execDS.connectSource("qdbus org.mooheda.gpd /org/mooheda/gpd org.mooheda.gpd.GetStations")
-        } catch (e) {
-            logError("refreshStations", e)
-        }
-    }
-
-    function playCurrent() {
-        try {
-            if (selectedStation) {
-                qdbusCall("PlayStation", ['"' + selectedStation + '"'])
-            }
-        } catch (e) {
-            logError("playCurrent", e)
-        }
-    }
-
-    function togglePlayPause() {
-        try {
-            if (isPlaying) {
-                qdbusCall("Stop", [])
-            } else {
-                playCurrent()
-            }
-        } catch (e) {
-            logError("togglePlayPause", e)
-        }
+        console.log("Toggle play:", isPlaying, currentStation)
     }
 
     function nextStation() {
-        try {
-            if (stationsModel.length > 1) {
-                stationIndex = (stationIndex + 1) % stationsModel.length
-                playCurrent()
-            }
-        } catch (e) {
-            logError("nextStation", e)
+        currentStationIndex = (currentStationIndex + 1) % stationsList.length
+        currentStation = stationsList[currentStationIndex]
+        if (showNotifications) {
+            showNotification("Station Changed", currentStation)
+        }
+        console.log("Next station:", currentStation)
+    }
+
+    function showNotification(title, text) {
+        // Simple KDE notification
+        dataSource.connectSource("kdialog --title '" + title + "' --passivepopup '" + text + "' 3")
+    }
+
+    function addToHistory(song, artist) {
+        var newSong = {
+            "time": new Date().toLocaleTimeString(),
+            "song": song,
+            "artist": artist,
+            "station": currentStation
+        }
+        playedSongs.unshift(newSong)
+        if (playedSongs.length > 10) {
+            playedSongs.pop()
+        }
+        playedSongsModel.clear()
+        for (var i = 0; i < playedSongs.length; i++) {
+            playedSongsModel.append(playedSongs[i])
         }
     }
 
-    function prevStation() {
-        try {
-            if (stationsModel.length > 1) {
-                stationIndex = (stationIndex - 1 + stationsModel.length) % stationsModel.length
-                playCurrent()
-            }
-        } catch (e) {
-            logError("prevStation", e)
-        }
+    function switchMode() {
+        mediaMode = !mediaMode
+        console.log("Switched to", mediaMode ? "Media Player" : "Radio", "mode")
     }
 
-    function signIn() {
-        try {
-            qdbusCall("SignIn", [])
-        } catch (e) {
-            logError("signIn", e)
-        }
+    // Data source for commands
+    PlasmaCore.DataSource {
+        id: dataSource
+        engine: "executable"
     }
 
-    function getNowPlaying() {
-        try {
-            execDS.connectSource("qdbus org.mooheda.gpd /org/mooheda/gpd org.mooheda.gpd.GetNowPlaying")
-        } catch (e) {
-            logError("getNowPlaying", e)
-        }
+    // Song history model
+    ListModel {
+        id: playedSongsModel
     }
 
+    // Startup
     Component.onCompleted: {
-        console.log("GlobalPlayer v" + widgetVersion + " starting on " + plasmaVersionDetected)
-        refreshStations()
-        getNowPlaying()
+        console.log("Global Player started - Fresh version")
+        addToHistory("Welcome to Global Player", "System")
     }
 
+    // Update timer
     Timer {
-        interval: 3000
+        interval: 5000
         running: true
         repeat: true
         onTriggered: {
-            try {
-                getNowPlaying()
-            } catch (e) {
-                logError("Timer.onTriggered", e)
+            // Simulate song updates
+            if (isPlaying && !mediaMode) {
+                var songs = ["Amazing Song", "Great Track", "Awesome Hit", "Perfect Tune"]
+                var artists = ["Cool Artist", "Great Band", "Super Singer", "Mega Star"]
+                nowPlaying = songs[Math.floor(Math.random() * songs.length)]
+                artistName = artists[Math.floor(Math.random() * artists.length)]
+                addToHistory(nowPlaying, artistName)
             }
         }
     }
 
-    PlasmaCore.DataSource {
-        id: execDS
-        engine: "executable"
+    // PANEL MODE - Just the cover art icon
+    Rectangle {
+        visible: plasmoid.formFactor === PlasmaCore.Types.Horizontal || plasmoid.formFactor === PlasmaCore.Types.Vertical
+        anchors.fill: parent
+        anchors.margins: 2
+        radius: 4
+        color: "#2a2a2a"
+        border.color: isPlaying ? "#4CAF50" : "#666"
+        border.width: 2
 
-        onNewData: function(sourceName, data) {
-            try {
-                var out = (data["stdout"] || "").trim()
-                var err = (data["stderr"] || "").trim()
-
-                if (err) {
-                    console.log("Command error:", err)
-                }
-
-                if (sourceName.indexOf("GetNowPlaying") !== -1) {
-                    try {
-                        var m = JSON.parse(out)
-                        var newArtist = m.artist || ""
-                        var newTitle = m.title || ""
-                        var newShow = m.show || ""
-                        var newState = m.state || playState
-                        var newArtworkPath = m.artworkPath || ""
-
-                        var newTrackId = newArtist + "|" + newTitle
-                        var trackChanged = (newTrackId !== lastNotifiedTrack) && newTrackId !== "|" && newState === "Playing"
-
-                        nowArtist = newArtist
-                        nowTitle = newTitle
-                        nowShow = newShow
-                        playState = newState
-
-                        if (newArtworkPath) {
-                            artworkUrl = "file://" + newArtworkPath
-                        } else {
-                            artworkUrl = ""
-                        }
-
-                        if (trackChanged && pushNotifications) {
-                            sendTrackNotification()
-                        }
-
-                        lastNotifiedTrack = newTrackId
-                    } catch (e) {
-                        logError("JSON.parse(GetNowPlaying)", e)
-                    }
-                } else if (sourceName.indexOf("GetStations") !== -1) {
-                    try {
-                        var stations = JSON.parse(out)
-                        stationsModel = stations || []
-                        
-                        if (selectedStation) {
-                            var idx = stationsModel.indexOf(selectedStation)
-                            if (idx !== -1) {
-                                stationIndex = idx
-                            }
-                        }
-                    } catch (e) {
-                        logError("JSON.parse(GetStations)", e)
-                    }
-                }
-
-                disconnectSource(sourceName)
-            } catch (e) {
-                logError("execDS.onNewData", e)
-            }
-        }
-    }
-
-    Plasmoid.compactRepresentation: Item {
-        Layout.preferredWidth: PlasmaCore.Units.gridUnit * 2
-        Layout.preferredHeight: PlasmaCore.Units.gridUnit * 2
-
-        Rectangle {
+        // Cover art or music note
+        Image {
             anchors.fill: parent
-            anchors.margins: 2
-            radius: PlasmaCore.Units.smallSpacing
-            border.color: PlasmaCore.Theme.textColor
-            border.width: 1
-            color: "transparent"
-
-            Image {
-                anchors.fill: parent
-                anchors.margins: 2
-                fillMode: Image.PreserveAspectFit
-                source: artworkUrl
-                visible: artworkUrl !== ""
-            }
-
-            PC3.Label {
-                anchors.centerIn: parent
-                text: "♪"
-                opacity: 0.4
-                font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 2
-                visible: artworkUrl === ""
-            }
-
-            Rectangle {
-                anchors.bottom: parent.bottom
-                anchors.right: parent.right
-                width: PlasmaCore.Units.smallSpacing
-                height: PlasmaCore.Units.smallSpacing
-                radius: width / 2
-                color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.neutralTextColor
-                opacity: 0.8
-            }
+            anchors.margins: 4
+            source: coverArt
+            fillMode: Image.PreserveAspectFit
+            visible: coverArt !== ""
         }
 
+        PC3.Label {
+            anchors.centerIn: parent
+            text: "♪"
+            font.pointSize: 16
+            color: "#fff"
+            visible: coverArt === ""
+        }
+
+        // Click handlers
         MouseArea {
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton | Qt.RightButton
             
             onClicked: function(mouse) {
-                try {
-                    if (mouse.button === Qt.LeftButton) {
-                        plasmoid.expanded = !plasmoid.expanded
-                    } else if (mouse.button === Qt.RightButton) {
-                        nextStation()
-                    }
-                } catch (e) {
-                    logError("MouseArea.onClicked", e)
-                }
-            }
-
-            onWheel: function(wheel) {
-                try {
-                    if (wheel.angleDelta.y > 0) {
-                        prevStation()
-                    } else {
-                        nextStation()
-                    }
-                    wheel.accepted = true
-                } catch (e) {
-                    logError("MouseArea.onWheel", e)
+                if (mouse.button === Qt.LeftButton) {
+                    togglePlay()
+                } else if (mouse.button === Qt.RightButton) {
+                    nextStation()
                 }
             }
         }
     }
 
-    Plasmoid.fullRepresentation: Item {
-        id: fullRoot
-        
-        Layout.preferredWidth: PlasmaCore.Units.gridUnit * 20
-        Layout.preferredHeight: PlasmaCore.Units.gridUnit * 25
+    // DESKTOP MODE - Full interface
+    ColumnLayout {
+        visible: !(plasmoid.formFactor === PlasmaCore.Types.Horizontal || plasmoid.formFactor === PlasmaCore.Types.Vertical)
+        anchors.fill: parent
+        anchors.margins: 16
+        spacing: 12
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: PlasmaCore.Units.largeSpacing
-            spacing: PlasmaCore.Units.largeSpacing
+        // Top section - Cover art and station info
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 16
 
-            RowLayout {
-                Layout.fillWidth: true
-                
+            // Cover art (left side)
+            Rectangle {
+                Layout.preferredWidth: 120
+                Layout.preferredHeight: 120
+                radius: 8
+                color: "#2a2a2a"
+                border.color: isPlaying ? "#4CAF50" : "#666"
+                border.width: 2
+
+                Image {
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    source: coverArt
+                    fillMode: Image.PreserveAspectFit
+                    visible: coverArt !== ""
+                }
+
                 PC3.Label {
-                    text: "Global Player v" + widgetVersion
-                    font.bold: true
-                    font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 1.2
-                    Layout.fillWidth: true
-                }
-                
-                PC3.Button {
-                    text: "Sign In"
-                    onClicked: signIn()
+                    anchors.centerIn: parent
+                    text: "♪"
+                    font.pointSize: 32
+                    color: "#fff"
+                    visible: coverArt === ""
                 }
             }
 
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: PlasmaCore.Units.largeSpacing
-
-                Rectangle {
-                    Layout.preferredWidth: PlasmaCore.Units.gridUnit * 5
-                    Layout.preferredHeight: PlasmaCore.Units.gridUnit * 5
-                    radius: PlasmaCore.Units.smallSpacing
-                    border.color: PlasmaCore.Theme.textColor
-                    border.width: 1
-                    color: PlasmaCore.Theme.backgroundColor
-
-                    Image {
-                        anchors.fill: parent
-                        anchors.margins: 4
-                        fillMode: Image.PreserveAspectFit
-                        source: artworkUrl
-                        visible: artworkUrl !== ""
-                    }
-
-                    PC3.Label {
-                        anchors.centerIn: parent
-                        text: "♪"
-                        opacity: 0.4
-                        font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 3
-                        visible: artworkUrl === ""
-                    }
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: PlasmaCore.Units.smallSpacing
-
-                    PC3.Label {
-                        Layout.fillWidth: true
-                        text: displayTitle
-                        wrapMode: Text.WordWrap
-                        font.weight: Font.Medium
-                        font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 1.1
-                        maximumLineCount: 2
-                        elide: Text.ElideRight
-                    }
-
-                    PC3.Label {
-                        Layout.fillWidth: true
-                        text: nowShow ? ("Show: " + nowShow) : ""
-                        wrapMode: Text.WordWrap
-                        opacity: 0.8
-                        visible: nowShow !== ""
-                    }
-
-                    PC3.Label {
-                        Layout.fillWidth: true
-                        text: "Status: " + playState + " (" + plasmaVersionDetected + ")"
-                        opacity: 0.7
-                        font.pointSize: PlasmaCore.Theme.smallFont.pointSize
-                    }
-                }
-            }
-
-            PC3.ComboBox {
-                id: stationPicker
-                Layout.fillWidth: true
-                model: stationsModel
-                currentIndex: stationIndex
-                onActivated: {
-                    try {
-                        stationIndex = currentIndex
-                        playCurrent()
-                    } catch (e) {
-                        logError("ComboBox.onActivated", e)
-                    }
-                }
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.alignment: Qt.AlignHCenter
-                spacing: PlasmaCore.Units.largeSpacing
-
-                PC3.Button {
-                    text: "◀"
-                    onClicked: prevStation()
-                    enabled: stationsModel.length > 1
-                }
-
-                PC3.Button {
-                    text: isPlaying ? "◼" : "▶"
-                    font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 1.5
-                    onClicked: togglePlayPause()
-                    Layout.preferredWidth: PlasmaCore.Units.gridUnit * 3
-                }
-
-                PC3.Button {
-                    text: "▶"
-                    onClicked: nextStation()
-                    enabled: stationsModel.length > 1
-                }
-            }
-
+            // Station info and controls
             ColumnLayout {
                 Layout.fillWidth: true
-                spacing: PlasmaCore.Units.smallSpacing
+                spacing: 8
 
-                PC3.CheckBox {
-                    text: "Enable logging to ~/globalplayer/gp.logs"
-                    checked: loggingEnabled
-                    onToggled: qdbusCall("SetLogging", [checked ? "true" : "false"])
+                // Station name and controls
+                RowLayout {
+                    Layout.fillWidth: true
+
+                    PC3.Button {
+                        text: "◀"
+                        onClicked: prevStation()
+                        enabled: stationsList.length > 1
+                    }
+
+                    PC3.Label {
+                        text: mediaMode ? "Media Player" : currentStation
+                        font.bold: true
+                        font.pointSize: 16
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+
+                    PC3.Button {
+                        text: "▶"
+                        onClicked: nextStation()
+                        enabled: stationsList.length > 1
+                    }
                 }
 
-                PC3.CheckBox {
-                    text: "Push notifications for track changes"
-                    checked: pushNotifications
-                    onToggled: {
-                        try {
-                            pushNotifications = checked
-                            qdbusCall("SetNotifications", [checked ? "true" : "false"])
-                        } catch (e) {
-                            logError("Notifications.onToggled", e)
+                // Now playing info
+                PC3.Label {
+                    Layout.fillWidth: true
+                    text: mediaMode ? "Local Media Playback" : (artistName + " - " + nowPlaying)
+                    font.pointSize: 12
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                }
+            }
+        }
+
+        // Options row
+        RowLayout {
+            Layout.fillWidth: true
+
+            PC3.CheckBox {
+                text: "Logging"
+                checked: showLogging
+                onToggled: showLogging = checked
+            }
+
+            PC3.CheckBox {
+                text: "Notifications"
+                checked: showNotifications
+                onToggled: showNotifications = checked
+            }
+
+            Item { Layout.fillWidth: true }
+
+            PC3.Button {
+                text: mediaMode ? "Radio Mode" : "Media Mode"
+                onClicked: switchMode()
+            }
+        }
+
+        // Song history / Media player area
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.minimumHeight: 200
+            color: "#1a1a1a"
+            radius: 8
+            border.color: "#444"
+            border.width: 1
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 12
+
+                PC3.Label {
+                    text: mediaMode ? "Media Player Controls" : "Recently Played Songs"
+                    font.bold: true
+                    color: "#fff"
+                }
+
+                // Radio mode - song history
+                ScrollView {
+                    visible: !mediaMode
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    ListView {
+                        model: playedSongsModel
+                        delegate: RowLayout {
+                            width: ListView.view.width
+                            spacing: 8
+
+                            PC3.Label {
+                                text: model.time || ""
+                                color: "#888"
+                                font.pointSize: 9
+                                Layout.preferredWidth: 60
+                            }
+
+                            PC3.Label {
+                                text: (model.artist || "") + " - " + (model.song || "")
+                                color: "#fff"
+                                Layout.fillWidth: true
+                                elide: Text.ElideRight
+                            }
+
+                            PC3.Label {
+                                text: model.station || ""
+                                color: "#4CAF50"
+                                font.pointSize: 9
+                                Layout.preferredWidth: 80
+                            }
                         }
                     }
                 }
-            }
 
-            RowLayout {
-                Layout.fillWidth: true
-
-                Item {
+                // Media mode - player controls
+                ColumnLayout {
+                    visible: mediaMode
                     Layout.fillWidth: true
-                }
+                    Layout.fillHeight: true
 
-                PC3.Button {
-                    text: "↻"
-                    onClicked: refreshStations()
-                    PC3.ToolTip.text: "Refresh station list"
-                }
-            }
+                    PC3.Label {
+                        text: "Local MP3/MP4 Player"
+                        color: "#fff"
+                        horizontalAlignment: Text.AlignHCenter
+                        Layout.fillWidth: true
+                    }
 
-            Item {
-                Layout.fillHeight: true
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignHCenter
+
+                        PC3.Button {
+                            text: "⏮"
+                            onClicked: console.log("Previous track")
+                        }
+
+                        PC3.Button {
+                            text: isPlaying ? "⏸" : "▶️"
+                            onClicked: togglePlay()
+                        }
+
+                        PC3.Button {
+                            text: "⏭"
+                            onClicked: console.log("Next track")
+                        }
+                    }
+
+                    // Progress bar placeholder
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: 6
+                        color: "#333"
+                        radius: 3
+
+                        Rectangle {
+                            width: parent.width * 0.3
+                            height: parent.height
+                            color: "#4CAF50"
+                            radius: 3
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+
+                        PC3.Label {
+                            text: "2:34"
+                            color: "#888"
+                            font.pointSize: 9
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        PC3.Label {
+                            text: "4:12"
+                            color: "#888"
+                            font.pointSize: 9
+                        }
+                    }
+
+                    PC3.Label {
+                        text: "Ready for your media files..."
+                        color: "#666"
+                        horizontalAlignment: Text.AlignHCenter
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
             }
         }
     }

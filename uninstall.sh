@@ -32,4 +32,4 @@ else
   nohup plasmashell > /dev/null 2>&1 &
 fi
 
-echo "[✓] Global Player v3.2 fully removed."
+echo "[✓] Global Player v3.2.2 fully removed."

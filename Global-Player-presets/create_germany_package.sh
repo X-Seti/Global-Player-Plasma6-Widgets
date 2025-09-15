@@ -1,3 +1,6 @@
+
+echo "[+] Creating Germany station list..."
+cat > "globalplayer-daemon/stations_static.json" << 'EOF'
 [
   {
     "name": "1LIVE",
