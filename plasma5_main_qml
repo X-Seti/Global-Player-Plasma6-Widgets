@@ -225,6 +225,7 @@ Item {
             for (var i = 0; i < args.length; ++i) {
                 var a = ("" + args[i]).replace(/\"/g, "\\\"")
                 cmd += " \"" + a + "\""
+                var cmd = "notify-send \"Global Player\" \"" ("" + args[i]).replace(/\"/g, "\\\"") + "\" --icon=audio-headphones"
             }
         }
         execDS.connectSource(cmd)
