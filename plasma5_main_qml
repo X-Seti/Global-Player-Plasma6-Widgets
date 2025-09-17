@@ -218,19 +218,18 @@ Item {
         }
     }
 
-    // D-Bus helper functions
     function qdbusCall(method, args) {
         var cmd = "qdbus org.mooheda.gpd /org/mooheda/gpd org.mooheda.gpd1." + method
         if (args && args.length > 0) {
             for (var i = 0; i < args.length; ++i) {
                 var a = ("" + args[i]).replace(/\"/g, "\\\"")
                 cmd += " \"" + a + "\""
-                var cmd = "notify-send \"Global Player\" \"" ("" + args[i]).replace(/\"/g, "\\\"") + "\" --icon=audio-headphones"
+                // Fixed the concatenation here:
+                var notifyCmd = "notify-send \"Global Player\" \"" + ("" + args[i]).replace(/\"/g, "\\\"") + "\" --icon=audio-headphones"
             }
         }
         execDS.connectSource(cmd)
     }
-
     function getNowPlaying() {
         if (!mediaMode) {
             qdbusCall("GetNowPlaying", [])
