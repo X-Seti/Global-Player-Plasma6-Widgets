@@ -33,7 +33,7 @@ PlasmoidItem {
     // Computed properties for display
     property string displayTitle: {
         if (nowArtist && nowTitle) {
-            return nowArtist + " – " + nowTitle
+            return nowArtist + " — " + nowTitle
         } else if (nowTitle) {
             return nowTitle
         } else if (selectedStation) {
@@ -218,7 +218,6 @@ PlasmoidItem {
             for (var i = 0; i < args.length; ++i) {
                 var a = ("" + args[i]).replace(/\"/g, "\\\"")
                 cmd += " \"" + a + "\""
-                var cmd = "notify-send \"Global Player\" \"" ("" + args[i]).replace(/\"/g, "\\\"") + "\" --icon=audio-headphones"
             }
         }
         execDS.connectSource(cmd)
@@ -458,6 +457,7 @@ PlasmoidItem {
                 visible: parent.containsMouse && !root.expanded
                 delay: 500
             }
+        }
     }
 
     // Full widget representation
@@ -530,7 +530,7 @@ PlasmoidItem {
                     spacing: 8
 
                     PC3.Button {
-                        text: "⏮"
+                        text: "⮜"
                         onClicked: prevStation()
                         enabled: mediaMode || stationsModel.length > 1
                         
@@ -597,7 +597,7 @@ PlasmoidItem {
                     }
 
                     PC3.Button {
-                        text: "⏭"
+                        text: "⮞"
                         onClicked: nextStation()
                         enabled: mediaMode || stationsModel.length > 1
                         
@@ -734,7 +734,7 @@ PlasmoidItem {
                         Layout.alignment: Qt.AlignHCenter
 
                         PC3.Button {
-                            text: "⏮"
+                            text: "⮜"
                             onClicked: prevStation()
                             
                             background: Rectangle {
@@ -794,7 +794,7 @@ PlasmoidItem {
                         }
 
                         PC3.Button {
-                            text: "⏭"
+                            text: "⮞"
                             onClicked: nextStation()
                             
                             background: Rectangle {
