@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# X-Seti - GlobalPlayer 3.2.2 with Station Preset Reader
+# X-Seti - GlobalPlayer 3.2.2 - User Choice Plasma Version
 set -euo pipefail
 
 PLASMOID_ID="org.mooheda.globalplayer"
@@ -20,13 +20,10 @@ extract_stations_from_preset() {
     
     echo "[+] Extracting stations from $(basename "$preset_file")..."
     
-    # Extract the JSON content between 'EOF' markers in the shell script
-    # Look for the pattern: cat > "..." << 'EOF' ... EOF
     awk '/cat.*stations_static\.json.*EOF/,/^EOF$/ {
         if ($0 !~ /cat.*EOF/ && $0 != "EOF") print
     }' "$preset_file" > "$output_file"
     
-    # Verify the extracted JSON is valid
     if python3 -m json.tool "$output_file" >/dev/null 2>&1; then
         local station_count=$(python3 -c "import json; data=json.load(open('$output_file')); print(len(data))" 2>/dev/null || echo "0")
         echo "    ✓ Extracted $station_count stations"
@@ -44,7 +41,6 @@ select_station_preset() {
     echo "========================================"
     echo ""
     
-    # Check what presets are actually available
     local available_presets=()
     local preset_descriptions=()
     
@@ -78,17 +74,14 @@ select_station_preset() {
         preset_descriptions+=("🇮🇹 Italy - RTL 102.5, Radio Deejay, RDS, Rai Radio, regional")
     fi
     
-    # Always offer default
     available_presets+=("default")
     preset_descriptions+=("🌍 Default - Use existing station configuration")
     
-    # Display available options
     for i in "${!available_presets[@]}"; do
         echo "$((i+1))) ${preset_descriptions[$i]}"
     done
     echo ""
     
-    # Get user selection
     while true; do
         read -p "Enter choice (1-${#available_presets[@]}): " choice
         
@@ -123,7 +116,6 @@ install_station_preset() {
         fi
     fi
     
-    # Map preset type to actual file
     local preset_file=""
     case "$preset_type" in
         "uk")      preset_file="${PRESETS_DIR}/create_uk_package.sh" ;;
@@ -147,42 +139,127 @@ install_station_preset() {
     fi
 }
 
+# Detect Plasma version automatically
+detect_plasma_version() {
+    echo "[+] Auto-detecting Plasma version..."
+    
+    # Method 1: Check plasmashell version directly
+    if command -v plasmashell >/dev/null 2>&1; then
+        local version_output=$(plasmashell --version 2>/dev/null)
+        if echo "$version_output" | grep -q "plasmashell"; then
+            local major_version=$(echo "$version_output" | grep -oP 'plasmashell \K[0-9]+' | head -1)
+            local minor_version=$(echo "$version_output" | grep -oP 'plasmashell [0-9]+\.\K[0-9]+' | head -1)
+            
+            if [ -n "$major_version" ]; then
+                echo "    ✓ Detected Plasma $major_version.$minor_version via plasmashell"
+                
+                # Return specific version for 6.4+
+                if [ "$major_version" -ge 6 ] && [ "${minor_version:-0}" -ge 4 ]; then
+                    return 64  # Plasma 6.4+
+                elif [ "$major_version" -ge 6 ]; then
+                    return 60  # Plasma 6.0-6.3
+                else
+                    return 50  # Plasma 5.x
+                fi
+            fi
+        fi
+    fi
+    
+    # Method 2: Check for version-specific tools
+    if command -v kquitapp6 >/dev/null 2>&1; then
+        echo "    ✓ Detected Plasma 6.x via kquitapp6"
+        return 60  # Default to 6.0 if can't determine minor version
+    fi
+    
+    if command -v kquitapp5 >/dev/null 2>&1; then
+        echo "    ✓ Detected Plasma 5.x via kquitapp5"
+        return 50
+    fi
+    
+    # Fallback: assume Plasma 6.0
+    echo "    ⚠️  Could not determine version, assuming Plasma 6.0"
+    return 60
+}
+
+# Manual Plasma version selection
+select_plasma_version() {
+    echo ""
+    echo "🖥️  Plasma Version Selection:"
+    echo "========================================"
+    echo ""
+    echo "Choose your Plasma version:"
+    echo ""
+    echo "1) 🔍 Automatic Detection (Recommended)"
+    echo "2) 🔧 Plasma 5.x (Manual)"
+    echo "3) ⚙️  Plasma 6.0-6.3 (Original layout, Unicode symbols)"
+    echo "4) 🎨 Plasma 6.4+ (Original layout, SVG icons)"
+    echo ""
+    
+    while true; do
+        read -p "Enter choice (1-4): " choice
+        
+        case $choice in
+            1)
+                detect_plasma_version
+                local detected=$?
+                
+                if [ $detected -eq 64 ]; then
+                    PLASMA_VERSION="6.4"
+                    echo "[+] Auto-detected: Plasma 6.4+ (will use SVG icons)"
+                elif [ $detected -eq 60 ]; then
+                    PLASMA_VERSION="6.0"
+                    echo "[+] Auto-detected: Plasma 6.0-6.3 (will use Unicode symbols)"
+                else
+                    PLASMA_VERSION="5"
+                    echo "[+] Auto-detected: Plasma 5.x"
+                fi
+                break
+                ;;
+            2)
+                PLASMA_VERSION="5"
+                echo "[+] Selected: Plasma 5.x"
+                break
+                ;;
+            3)
+                PLASMA_VERSION="6.0"
+                echo "[+] Selected: Plasma 6.0-6.3 (Unicode symbols)"
+                break
+                ;;
+            4)
+                PLASMA_VERSION="6.4"
+                echo "[+] Selected: Plasma 6.4+ (SVG icons)"
+                break
+                ;;
+            *)
+                echo "❌ Invalid choice. Please enter 1, 2, 3, or 4."
+                ;;
+        esac
+    done
+    
+    return 0
+}
+
 # Main installation starts here
-echo "🎵 Global Player v3.2.2 Installation with Station Presets"
-echo "========================================================"
+echo "🎵 Global Player v3.2.2 Installation"
+echo "====================================="
 
 # Check if preset directory exists
 if [ ! -d "$PRESETS_DIR" ]; then
     echo "❌ Error: Global-Player-presets directory not found!"
     echo "   Expected: $PRESETS_DIR"
-    echo "   Please ensure the Global-Player-presets directory exists."
     exit 1
 fi
 
-# Detect Plasma version - Check 5 first, then 6
-PLASMA_VERSION=""
-if command -v kquitapp5 >/dev/null 2>&1; then
-    PLASMA_VERSION="5"
-elif command -v kquitapp6 >/dev/null 2>&1; then
-    PLASMA_VERSION="6"
-else
-    echo "Warning: Could not detect Plasma version. Checking for plasmashell..."
-    if command -v plasmashell >/dev/null 2>&1; then
-        PLASMA_VERSION="5"  # Default to 5 if uncertain
-    else
-        echo "Error: No Plasma installation detected!"
-        exit 1
-    fi
-fi
-
-echo "[+] Detected Plasma ${PLASMA_VERSION}"
+# Let user choose Plasma version
+select_plasma_version
 
 # Select station preset
 select_station_preset
 
+echo ""
 echo "[+] Installing dependencies (you may need sudo):"
-if [ "$PLASMA_VERSION" = "6" ]; then
-    echo "    Debian/Ubuntu: sudo apt install mpv qdbus python3-dbus python3-gi python3-requests python3-pyqt6.qtwebengine"
+if [ "$PLASMA_VERSION" = "6.4" ] || [ "$PLASMA_VERSION" = "6.0" ]; then
+    echo "    Debian/Ubuntu: sudo apt install mpv qdbus-qt6 python3-dbus python3-gi python3-requests python3-pyqt6.qtwebengine"
     echo "    Arch:          sudo pacman -S mpv qt6-tools python-dbus python-gobject python-requests python-pyqt6-webengine"
     echo "    Fedora:        sudo dnf install mpv qt6-qttools python3-dbus python3-gobject python3-requests python3-pyqt6-webengine"
 else
@@ -191,10 +268,11 @@ else
     echo "    Fedora:        sudo dnf install mpv qt5-qttools python3-dbus python3-gobject python3-requests python3-pyqt5-webengine"
 fi
 
+echo ""
 echo "[+] Installing plasmoid to ${PLASMOID_DST}"
 mkdir -p "${PLASMOID_DST}/contents/ui"
 
-# Install daemon files first
+# Install daemon files
 echo "[+] Installing daemon files..."
 if [ -d "${DAEMON_SRC}" ]; then
     mkdir -p "${DAEMON_DST}"
@@ -211,17 +289,38 @@ if install_station_preset "$PRESET" "$TEMP_STATIONS"; then
     cp "$TEMP_STATIONS" "${DAEMON_DST}/stations_static.json"
     rm -f "$TEMP_STATIONS"
     echo "    ✓ Station preset installed to daemon"
-else
-    echo "    ⚠️  Failed to install preset, using default stations"
 fi
 
 # Install appropriate QML and metadata based on Plasma version
-if [ "$PLASMA_VERSION" = "6" ]; then
-    echo "[+] Installing Plasma 6 files..."
+echo "[+] Installing Plasma ${PLASMA_VERSION} files..."
+
+if [ "$PLASMA_VERSION" = "6.4" ]; then
+    # Plasma 6.4+ with SVG icons
+    
+    if [ -f "$(dirname "$0")/plasma6_4_svg_icons.qml" ]; then
+        cp "$(dirname "$0")/plasma6_4_svg_icons.qml" "${PLASMOID_DST}/contents/ui/main.qml"
+        echo "    ✓ Plasma 6.4 QML (SVG icons) installed"
+    else
+        echo "❌ Error: plasma6_4_svg_icons.qml not found!"
+        exit 1
+    fi
+    
+    if [ -f "$(dirname "$0")/org.mooheda.globalplayer/v6/metadata.json" ]; then
+        cp "$(dirname "$0")/org.mooheda.globalplayer/v6/metadata.json" "${PLASMOID_DST}/metadata.json"
+        echo "    ✓ Plasma 6 metadata.json installed"
+    fi
+    
+    if [ -f "$(dirname "$0")/org.mooheda.globalplayer/v6/metadata.desktop" ]; then
+        cp "$(dirname "$0")/org.mooheda.globalplayer/v6/metadata.desktop" "${PLASMOID_DST}/metadata.desktop"
+        echo "    ✓ Plasma 6 metadata.desktop installed"
+    fi
+    
+elif [ "$PLASMA_VERSION" = "6.0" ]; then
+    # Plasma 6.0-6.3 with Unicode symbols (original)
     
     if [ -f "$(dirname "$0")/plasma6_main_qml" ]; then
         cp "$(dirname "$0")/plasma6_main_qml" "${PLASMOID_DST}/contents/ui/main.qml"
-        echo "    ✓ Plasma 6 QML installed"
+        echo "    ✓ Plasma 6.0 QML (Unicode symbols) installed"
     else
         echo "❌ Error: plasma6_main_qml not found!"
         exit 1
@@ -238,7 +337,7 @@ if [ "$PLASMA_VERSION" = "6" ]; then
     fi
 
 elif [ "$PLASMA_VERSION" = "5" ]; then
-    echo "[+] Installing Plasma 5 files..."
+    # Plasma 5.x
     
     if [ -f "$(dirname "$0")/plasma5_main_qml" ]; then
         cp "$(dirname "$0")/plasma5_main_qml" "${PLASMOID_DST}/contents/ui/main.qml"
@@ -254,50 +353,40 @@ elif [ "$PLASMA_VERSION" = "5" ]; then
     fi
 fi
 
-# Install hotkey daemon
-echo "[+] Installing hotkey daemon..."
-if [ -f "$(dirname "$0")/hotkey_daemon.py" ]; then
-    cp "$(dirname "$0")/hotkey_daemon.py" "${DAEMON_DST}/hotkey_daemon.py"
-    chmod +x "${DAEMON_DST}/hotkey_daemon.py"
-    echo "    ✓ Hotkey daemon installed"
-    
-    # Create hotkey service
-    cat > "${HOME}/.config/systemd/user/gpd-hotkeys.service" << EOF
-[Unit]
-Description=Global Player Hotkey Daemon
-After=gpd.service
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/env python3 ${DAEMON_DST}/hotkey_daemon.py
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=default.target
-EOF
-    
-    systemctl --user daemon-reload
-    systemctl --user enable --now gpd-hotkeys.service
-    echo "    ✓ Hotkey service installed and started"
-else
-    echo "    ⚠️  hotkey_daemon.py not found, skipping hotkey setup"
-fi
-
 echo "[+] Installing systemd --user service"
 mkdir -p "${HOME}/.config/systemd/user"
 if [ -f "$(dirname "$0")/gpd.service" ]; then
     cp "$(dirname "$0")/gpd.service" "${HOME}/.config/systemd/user/gpd.service"
     systemctl --user daemon-reload || true
-    systemctl --user enable --now gpd.service || true
+    
+    systemctl --user stop gpd.service 2>/dev/null || true
+    systemctl --user enable gpd.service || true
+    systemctl --user start gpd.service || true
+    
     echo "    ✓ Service installed and started"
+    
+    sleep 2
+    if systemctl --user is-active gpd.service >/dev/null 2>&1; then
+        echo "    ✓ Service is running"
+    else
+        echo "    ⚠️  Service may have failed to start"
+    fi
 fi
 
-# Wait for daemon to start
-echo "[+] Waiting for daemon to initialize..."
-sleep 3
+# Test D-Bus connection
+echo "[+] Testing D-Bus connection..."
+sleep 2
+if qdbus org.mooheda.gpd /org/mooheda/gpd >/dev/null 2>&1; then
+    echo "    ✓ D-Bus connection successful"
+    
+    STATIONS_JSON=$(qdbus org.mooheda.gpd /org/mooheda/gpd org.mooheda.gpd1.GetStations 2>/dev/null || echo "[]")
+    STATION_COUNT=$(echo "$STATIONS_JSON" | python3 -c "import sys, json; print(len(json.loads(sys.stdin.read())))" 2>/dev/null || echo "0")
+    echo "    ✓ Found $STATION_COUNT stations via D-Bus"
+else
+    echo "    ⚠️  D-Bus connection failed"
+fi
 
-# Clear all caches
+# Clear caches
 echo "[+] Clearing caches..."
 rm -rf ~/.cache/plasma* ~/.cache/plasmashell ~/.cache/krunner 2>/dev/null || true
 echo "    ✓ Cleared Plasma caches"
@@ -305,28 +394,33 @@ echo "    ✓ Cleared Plasma caches"
 # Restart Plasma
 echo "[+] Restarting Plasma..."
 if systemctl --user is-active plasma-plasmashell.service >/dev/null 2>&1; then
-    echo "    → Using systemd service"
     systemctl --user restart plasma-plasmashell.service
 elif command -v kquitapp6 >/dev/null 2>&1; then
-    echo "    → Using kquitapp6"
     kquitapp6 plasmashell || true
     sleep 2
     nohup plasmashell > /dev/null 2>&1 &
+elif command -v kquitapp5 >/dev/null 2>&1; then
+    kquitapp5 plasmashell || true
+    sleep 2
+    nohup plasmashell > /dev/null 2>&1 &
 else
-    echo "    → Using pkill fallback"
     pkill plasmashell 2>/dev/null || true
     sleep 2
     nohup plasmashell > /dev/null 2>&1 &
 fi
 
 echo "✅ Plasma restarted!"
-echo "💡 Wait a few seconds for Plasma to fully load"
 
 echo ""
 echo "✅ Global Player v3.2.2 installation complete!"
 echo ""
 echo "📋 Installation Summary:"
-echo "   • Target: Plasma ${PLASMA_VERSION}"  
+echo "   • Plasma Version: ${PLASMA_VERSION}"
+if [ "$PLASMA_VERSION" = "6.4" ]; then
+    echo "   • UI Style: Original layout with SVG icons"
+elif [ "$PLASMA_VERSION" = "6.0" ]; then
+    echo "   • UI Style: Original layout with Unicode symbols"
+fi
 echo "   • Stations: $PRESET_NAME"
 echo "   • Widget: ${PLASMOID_DST}"
 echo "   • Daemon: ${DAEMON_DST}"
@@ -335,8 +429,3 @@ echo "🎯 Next Steps:"
 echo "   1. Wait 10-15 seconds for Plasma to reload"
 echo "   2. Right-click panel → Add Widgets → 'Global Player'"
 echo ""
-echo "🎵 Your selected station preset is now active!"
-echo ""
-echo "🔧 Troubleshooting:"
-echo "   • Check service: systemctl --user status gpd.service"
-echo "   • Check stations: cat ${DAEMON_DST}/stations_static.json"
