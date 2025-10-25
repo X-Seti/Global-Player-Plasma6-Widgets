@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# X-Seti - GlobalPlayer 3.2.2 - User Choice Plasma Version
+# X-Seti - GlobalPlayer 3.2.3 - User Choice Plasma Version
 set -euo pipefail
 
 PLASMOID_ID="org.mooheda.globalplayer"
@@ -92,7 +92,7 @@ select_station_preset() {
             echo "[+] Selected: $PRESET_NAME"
             break
         else
-            echo "❌ Invalid choice. Please enter a number between 1 and ${#available_presets[@]}."
+            echo "Invalid choice. Please enter a number between 1 and ${#available_presets[@]}."
         fi
     done
     
@@ -240,7 +240,7 @@ select_plasma_version() {
 }
 
 # Main installation starts here
-echo "🎵 Global Player v3.2.2 Installation"
+echo "🎵 Global Player v3.2.3 Installation"
 echo "====================================="
 
 # Check if preset directory exists
@@ -260,8 +260,11 @@ echo ""
 echo "[+] Installing dependencies (you may need sudo):"
 if [ "$PLASMA_VERSION" = "6.4" ] || [ "$PLASMA_VERSION" = "6.0" ]; then
     echo "    Debian/Ubuntu: sudo apt install mpv qdbus-qt6 python3-dbus python3-gi python3-requests python3-pyqt6.qtwebengine"
+    echo "                   sudo apt install python3-dbus python3-gi"
     echo "    Arch:          sudo pacman -S mpv qt6-tools python-dbus python-gobject python-requests python-pyqt6-webengine"
+    echo "                   sudo pacman -S python-dbus python-gobject"
     echo "    Fedora:        sudo dnf install mpv qt6-qttools python3-dbus python3-gobject python3-requests python3-pyqt6-webengine"
+    echo "                   sudo dnf install python3-dbus python3-gobject"
 else
     echo "    Debian/Ubuntu: sudo apt install mpv qdbus python3-dbus python3-gi python3-requests python3-pyqt5.qtwebengine"
     echo "    Arch:          sudo pacman -S mpv qt5-tools python-dbus python-gobject python-requests python-pyqt5-webengine"  
@@ -297,11 +300,11 @@ echo "[+] Installing Plasma ${PLASMA_VERSION} files..."
 if [ "$PLASMA_VERSION" = "6.4" ]; then
     # Plasma 6.4+ with SVG icons
     
-    if [ -f "$(dirname "$0")/plasma6_4_svg_icons.qml" ]; then
-        cp "$(dirname "$0")/plasma6_4_svg_icons.qml" "${PLASMOID_DST}/contents/ui/main.qml"
+    if [ -f "$(dirname "$0")/plasma6_4_main.qml" ]; then
+        cp -f "$(dirname "$0")/plasma6_4_main.qml" "${PLASMOID_DST}/contents/ui/main.qml"
         echo "    ✓ Plasma 6.4 QML (SVG icons) installed"
     else
-        echo "❌ Error: plasma6_4_svg_icons.qml not found!"
+        echo "❌ Error: plasma6_4_main.qml not found!"
         exit 1
     fi
     
@@ -319,7 +322,7 @@ elif [ "$PLASMA_VERSION" = "6.0" ]; then
     # Plasma 6.0-6.3 with Unicode symbols (original)
     
     if [ -f "$(dirname "$0")/plasma6_main_qml" ]; then
-        cp "$(dirname "$0")/plasma6_main_qml" "${PLASMOID_DST}/contents/ui/main.qml"
+        cp -f "$(dirname "$0")/plasma6_main_qml" "${PLASMOID_DST}/contents/ui/main.qml"
         echo "    ✓ Plasma 6.0 QML (Unicode symbols) installed"
     else
         echo "❌ Error: plasma6_main_qml not found!"
@@ -340,7 +343,7 @@ elif [ "$PLASMA_VERSION" = "5" ]; then
     # Plasma 5.x
     
     if [ -f "$(dirname "$0")/plasma5_main_qml" ]; then
-        cp "$(dirname "$0")/plasma5_main_qml" "${PLASMOID_DST}/contents/ui/main.qml"
+        cp -f "$(dirname "$0")/plasma5_main_qml" "${PLASMOID_DST}/contents/ui/main.qml"
         echo "    ✓ Plasma 5 QML installed"
     else
         echo "❌ Error: plasma5_main_qml not found!"
@@ -412,7 +415,7 @@ fi
 echo "✅ Plasma restarted!"
 
 echo ""
-echo "✅ Global Player v3.2.2 installation complete!"
+echo "✅ Global Player v3.2.3 installation complete!"
 echo ""
 echo "📋 Installation Summary:"
 echo "   • Plasma Version: ${PLASMA_VERSION}"

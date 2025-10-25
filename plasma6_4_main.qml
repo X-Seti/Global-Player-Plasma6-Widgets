@@ -1,7 +1,7 @@
 // X-Seti - Oct 2025 - Global Player - Plasma 6.4 Compatible with Enhanced D-Bus
 import QtQuick
 import QtQuick.Layouts
-import QtQuick.Controls as QQC2
+import QtQuick.Controls
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.components 3.0 as PC3
 import org.kde.plasma.plasmoid
@@ -682,12 +682,14 @@ PlasmoidItem {
                     font.bold: true
                 }
 
-                ScrollView {
+                ListView {
                     visible: !mediaMode
                     Layout.fillWidth: true
                     Layout.fillHeight: true
 
                     ListView {
+                        anchors.fill: parent
+                        clip: true
                         model: playedSongsModel
                         delegate: RowLayout {
                             width: ListView.view ? ListView.view.width : 0

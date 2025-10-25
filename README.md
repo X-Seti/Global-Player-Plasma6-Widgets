@@ -1,270 +1,218 @@
-# Global Player Plasma 6.4 Widget - X-Seti - Oct 24 2025
+# Global Player Plasma 6.4 Widget - X-Seti - Oct 25 2025
 
-## Files Included
+## Quick Start Installation
 
-### Core Files (Required)
-2. **plasma6_4_main.qml** - Fixed QML with connection retry logic 
-3. **diagnose.sh** - Diagnostic tool for troubleshooting
-
-### Utility Files
-4. **quick_fix.sh** - One-command fix application script
-
-### Documentation
-5. **PLASMA_6.4_FIX_GUIDE.md** - Complete installation and troubleshooting guide
-6. **COMPLETE_FIX_SUMMARY.md** - Technical details of all changes
-
-## Quick Start
-
-### For Fresh Installation:
 ```bash
-# 2. Make scripts executable
-chmod +x install_fixed.sh diagnose.sh
+# 1. Clone or download the repository
+cd Global-Player-Plasma6-Widgets
 
-# 3. Run the installer
-./install_fixed.sh
-
-# 4. Verify installation
-./diagnose.sh
-```
-
-### For Existing Installation:
-```bash
-# 1. Backup your current install.sh and plasma6_main_qml
-cp install.sh install.sh.backup
-cp plasma6_main_qml plasma6_main_qml.backup
-
-# 2. Replace with fixed versions
-cp install_fixed.sh install.sh
-cp plasma6_4_main.qml plasma6_main_qml
-
-# 3. Reinstall
+# 2. Run the installer
+chmod +x install.sh
 ./install.sh
 
-# 4. Verify
-./diagnose.sh
+# 3. Select Plasma 6.4 (option 4) and your region (e.g., UK = option 1)
+
+# 4. Wait for Plasma to restart (10-15 seconds)
+
+# 5. Add widget: Right-click panel → Add Widgets → "Global Player"
 ```
 
-### Using Quick Fix (Automatic):
-```bash
-# Place quick_fix.sh in your Global Player directory
-chmod +x quick_fix.sh
-./quick_fix.sh
-```
+## ⚠️ Important: First-Time Setup
 
-## 🔧 What's Fixed
+After adding the widget, **if you see "No stations available"**:
 
-### Issue #1: Plasma Version Detection 
-- **Before:** Failed to detect Plasma 6.4
-- **After:** Multi-method detection (plasmashell version, kquitapp6, metadata.json)
+1. **Click the "Retry" button** in the widget's error banner, OR
+2. **Open the widget** and click the refresh/reload icon
 
-### Issue #2: Radio Stations Not Loading 
-- **Before:** Silent failures, no error messages
-- **After:** 
-  - Connection retry logic (10 attempts)
-  - Visual status indicators
-  - Error messages in UI
-  - "Retry" and "Check Service" buttons
+The stations will then load properly. This is a one-time issue on first launch.
 
-### Issue #3: No User Feedback 
-- **Before:** Widget showed nothing when daemon offline
-- **After:**
-  - Red border when disconnected
-  - Yellow banner with error details
-  - Tooltips show connection status
-  - Station count display
+## Verification
 
-## File Descriptions
-
-### install_fixed.sh (14KB)
-Replace your existing `install.sh` with this file.
-
-**Improvements:**
-- Better Plasma 6.4 detection
-- D-Bus connection test after install
-- Station count verification
-- Service health checks
-- Better error messages
-
-### plasma6_4_main.qml (25KB)
-Replace your existing `plasma6_main_qml` with this file.
-
-**Improvements:**
-- Connection retry logic (10 attempts on startup)
-- Visual connection status (green/red borders)
-- Error banner with Retry button
-- Enhanced tooltips with diagnostics
-- Better D-Bus error handling
-- Station counter display
-
-### diagnose.sh (6.5KB)
-New diagnostic tool - add to your Global Player directory.
-
-**Features:**
-- Checks Plasma version
-- Verifies daemon service
-- Tests D-Bus connection
-- Lists loaded stations
-- Shows daemon logs
-- Checks dependencies
-- Provides fix recommendations
-
-### quick_fix.sh (2.3KB)
-Optional - automates the fix process.
-
-**What it does:**
-1. Backs up existing files
-2. Applies all fixes
-3. Reinstalls widget
-4. Runs diagnostic
-5. Shows results
-
-## Verification Steps
-
-After installation, verify everything works:
+Check everything is working:
 
 ```bash
-# 1. Check daemon is running
+# Daemon should be running
 systemctl --user status gpd.service
-# Expected: Active (running)
 
-# 2. Test D-Bus
+# Should return 25 stations (for UK preset)
 qdbus org.mooheda.gpd /org/mooheda/gpd org.mooheda.gpd1.GetStations
-# Expected: JSON array of stations
+```
 
-# 3. Run diagnostic
-./diagnose.sh
-# Expected: All ✓ checkmarks
+## What's New in This Version
 
-# 4. Add widget to panel
-# Right-click panel → Add Widgets → Search "Global Player"
+### ✅ Plasma 6.4 Support
+- Auto-detects Plasma version (5.x, 6.0-6.3, 6.4+)
+- Uses SVG icons instead of Unicode symbols
+- Improved compatibility with latest KDE
+
+### ✅ Better Error Handling
+- Connection retry logic (10 attempts on startup)
+- Visual status indicators (red/green borders)
+- Error messages shown in UI
+- "Retry" button for manual reconnection
+
+### ✅ Regional Station Presets
+Choose from 6 regional station packages:
+- 🇬🇧 **UK** - 25 stations (Heart, Capital, Classic FM, LBC, etc.)
+- 🇺🇸 **USA** - 15+ stations (iHeartRadio, NPR, KEXP, etc.)
+- 🇨🇦 **Canada** - 15 stations (Jack FM, Virgin Radio, CBC, etc.)
+- 🇩🇪 **Germany** - 18 stations (1LIVE, Bayern 3, SWR3, etc.)
+- 🇪🇸 **Spain** - 18 stations (Cadena SER, Los 40, Europa FM, etc.)
+- 🇮🇹 **Italy** - 20 stations (RTL 102.5, Radio Deejay, RDS, etc.)
+
+## System Requirements
+
+### Plasma 6.4+
+```bash
+# Arch Linux
+sudo pacman -S mpv qt6-tools python-dbus python-gobject python-requests python-pyqt6-webengine
+
+# Ubuntu/Debian
+sudo apt install mpv qdbus-qt6 python3-dbus python3-gi python3-requests python3-pyqt6.qtwebengine
+
+# Fedora
+sudo dnf install mpv qt6-qttools python3-dbus python3-gobject python3-requests python3-pyqt6-webengine
+```
+
+### Plasma 5.x
+```bash
+# Arch Linux
+sudo pacman -S mpv qt5-tools python-dbus python-gobject python-requests python-pyqt5-webengine
+
+# Ubuntu/Debian  
+sudo apt install mpv qdbus python3-dbus python3-gi python3-requests python3-pyqt5.qtwebengine
+
+# Fedora
+sudo dnf install mpv qt5-qttools python3-dbus python3-gobject python3-requests python3-pyqt5-webengine
 ```
 
 ## Troubleshooting
 
-### Widget shows "?" in panel
-**Cause:** Daemon not connected
-
-**Fix:**
+### "Daemon not connected"
 ```bash
+# Restart the daemon
 systemctl --user restart gpd.service
-./diagnose.sh
+
+# Check status
+systemctl --user status gpd.service
+
+# View logs
+journalctl --user -u gpd.service -n 50
 ```
 
-### "No stations available"
-**Cause:** stations_static.json missing or empty
+### "No stations available" 
+**Most common solution:** Click the **"Retry" button** in the widget, or open the widget and click refresh.
 
-**Fix:**
+If that doesn't work:
 ```bash
-./install.sh  # Reinstall with station preset
-cat ~/globalplayer-daemon/stations_static.json  # Verify stations exist
+# Check if stations file exists and has content
+cat ~/globalplayer-daemon/stations_static.json
+
+# Test D-Bus
+qdbus org.mooheda.gpd /org/mooheda/gpd org.mooheda.gpd1.GetStations
+
+# If needed, reinstall with the install script
+./install.sh
 ```
 
 ### Widget doesn't appear in "Add Widgets"
-**Cause:** Plasma cache
-
-**Fix:**
 ```bash
-rm -rf ~/.cache/plasma*
+# Clear Plasma cache
+rm -rf ~/.cache/plasma* ~/.cache/plasmashell
+
+# Restart Plasma
 systemctl --user restart plasma-plasmashell.service
+# OR
+kquitapp6 plasmashell && kstart plasmashell
 ```
 
-## Documentation Files
-
-### PLASMA_6.4_FIX_GUIDE.md
-Complete installation and troubleshooting guide with:
-- Step-by-step installation
-- All troubleshooting scenarios
-- Quick fix commands
-- Visual indicator explanations
-- Dependency requirements
-
-### COMPLETE_FIX_SUMMARY.md
-Technical documentation with:
-- Before/after code comparisons
-- All changes explained
-- Technical implementation details
-- Performance impact
-- Migration path
-- File checksums
-
-## System Requirements
-
-### For Plasma 6.4:
-- KDE Plasma 6.0 or higher (6.4 tested)
-- mpv
-- qdbus-qt6 (or qdbus)
-- Python 3 with: dbus, gi, requests
-- PyQt6 WebEngine (for sign-in feature)
-
-### Installation (Arch Linux):
+### Stations won't play
 ```bash
-sudo pacman -S mpv qt6-tools python-dbus python-gobject python-requests python-pyqt6-webengine
+# Test if mpv is working
+mpv https://media-ssl.musicradio.com/ClassicFM
+
+# If not, install mpv
+sudo pacman -S mpv  # Arch
+sudo apt install mpv  # Ubuntu/Debian
 ```
 
-### Installation (Ubuntu/Debian):
+### Missing python3-dbus on second PC
 ```bash
-sudo apt install mpv qdbus-qt6 python3-dbus python3-gi python3-requests python3-pyqt6.qtwebengine
+# Install the required Python dependencies
+sudo apt install python3-dbus python3-gi  # Ubuntu/Debian
+sudo pacman -S python-dbus python-gobject  # Arch
+sudo dnf install python3-dbus python3-gobject  # Fedora
+
+# Restart daemon after installing
+systemctl --user restart gpd.service
 ```
 
-### Installation (Fedora):
-```bash
-sudo dnf install mpv qt6-qttools python3-dbus python3-gobject python3-requests python3-pyqt6-webengine
+## File Structure
+
+```
+Global-Player-Plasma6-Widgets/
+├── install.sh                    # Main installer (UPDATED)
+├── plasma6_4_main.qml            # Plasma 6.4+ QML (SVG icons, no ScrollView)
+├── plasma6_main_qml              # Plasma 6.0-6.3 QML (Unicode symbols)
+├── plasma5_main_qml              # Plasma 5.x QML
+├── globalplayer-daemon/          # Backend daemon
+│   ├── gpd.py                    # Main daemon
+│   ├── playback_mpv.py           # MPV integration
+│   └── stations_static.json      # Default stations (replaced by preset)
+├── Global-Player-presets/        # Regional station packages
+│   ├── create_uk_package.sh
+│   ├── create_usa_package.sh
+│   ├── create_canada_package.sh
+│   ├── create_germany_package.sh
+│   ├── create_spain_package.sh
+│   └── create_italy_package.sh
+├── org.mooheda.globalplayer/     # Metadata files
+│   ├── v5/metadata.desktop
+│   └── v6/
+│       ├── metadata.json
+│       └── metadata.desktop
+└── gpd.service                   # Systemd user service
 ```
 
-## Station Presets Available
+## Key Changes from Original
 
-The installer offers these regional presets:
-- 🇬🇧 UK - 25 stations (Heart, Capital, Classic FM, LBC, etc.)
-- 🇺🇸 USA - 15+ stations (iHeartRadio, NPR, KEXP, etc.)
-- 🇨🇦 Canada - 15 stations (Jack FM, Virgin Radio, CBC, etc.)
-- 🇩🇪 Germany - 18 stations (1LIVE, Bayern 3, SWR3, etc.)
-- 🇪🇸 Spain - 18 stations (Cadena SER, Los 40, Europa FM, etc.)
-- 🇮🇹 Italy - 20 stations (RTL 102.5, Radio Deejay, RDS, etc.)
+### install.sh
+- ✅ Forces overwrite of existing main.qml with `-f` flag
+- ✅ Copies `plasma6_4_main.qml` (not plasma6_4_svg_icons.qml)
+- ✅ Fixed typos in dependency installation commands
+- ✅ Better Plasma 6.4 version detection
 
-## Testing Checklist
+### plasma6_4_main.qml
+- ✅ Removed broken ScrollView (not available in Plasma 6.4)
+- ✅ Uses plain Item with ListView and clip: true instead
+- ✅ Connection retry logic for daemon
+- ✅ Visual error indicators
+- ✅ SVG icons via Kirigami.Icon (system icons, no files needed)
 
-After installation, test these features:
+## Usage
 
-- [ ] Widget appears in "Add Widgets" menu
-- [ ] Widget shows in panel with music note icon
-- [ ] Border is green (connected) not red (disconnected)
-- [ ] Clicking icon toggles play/pause
-- [ ] Right-clicking switches stations
-- [ ] Scrolling on icon changes stations
-- [ ] Opening full view shows station list
-- [ ] Station counter shows (e.g., "3 of 25")
-- [ ] No error banners visible
-- [ ] Tooltip shows connection status
+### Panel Mode (Compact)
+- **Left click** - Play/Pause
+- **Right click** - Next station
+- **Middle click** - Open full widget
+- **Scroll wheel** - Previous/Next station
 
-If any fail, run `./diagnose.sh` for detailed diagnostics.
-
-## 📞 Support
-
-If issues persist:
-
-1. Run diagnostic and save output:
-   ```bash
-   ./diagnose.sh > diagnosis.txt
-   ```
-
-2. Check daemon logs:
-   ```bash
-   journalctl --user -u gpd.service --no-pager > daemon-logs.txt
-   ```
-
-3. Share these files when asking for help
-
-## License
-
-GPL v3 (same as original Global Player)
+### Full Widget
+- **Station dropdown** - Select station
+- **Play/Pause button** - Control playback
+- **Previous/Next buttons** - Navigate stations
+- **Mode switch** - Toggle Radio/Media (media mode not yet implemented)
 
 ## Credits
 
 - **Original Author:** X-Seti (Mooheda)
-- **Plasma 6.4 Fixes:** Community contribution
-- **Version:** 3.2.2 (Plasma 6.4 compatible)
+- **Plasma 6.4 Fixes:** Community contributions
+- **License:** GPL v3
 
----
+## Support
 
-**Last Updated:** October 25, 2025
-**Compatible With:** KDE Plasma 6.0 - 6.4+
+- Check daemon status: `systemctl --user status gpd.service`
+- View daemon logs: `journalctl --user -u gpd.service -f`
+- Test D-Bus: `qdbus org.mooheda.gpd /org/mooheda/gpd`
+
+For more help, check the logs and ensure all dependencies are installed correctly.
