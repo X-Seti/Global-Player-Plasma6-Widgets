@@ -1,4 +1,4 @@
-// X-Seti - Sept 15 2025 - Global Player - Plasma 5 Clean Version with D-Bus Integration
+// X-Seti - Sept 15 2025 - Global Player - Plasma 5.2 version with D-Bus Integration
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 import QtQuick.Controls 2.15

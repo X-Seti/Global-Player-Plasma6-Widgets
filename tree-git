@@ -1,0 +1,43 @@
+.
+├── globalplayer-daemon
+│   ├── gpd.py
+│   ├── playback_mpv.py
+│   └── stations_static.json
+├── Global-Player-presets
+│   ├── create_canada_package.sh
+│   ├── create_germany_package.sh
+│   ├── create_italy_package.sh
+│   ├── create_package_selector.sh
+│   ├── create_spain_package.sh
+│   ├── create_uk_package.sh
+│   └── create_usa_package.sh
+├── gpd.service
+├── hotkey_daemon.py
+├── install.sh
+├── LICENSE
+├── License_terms_freeware.md
+├── org.mooheda.globalplayer
+│   ├── v5
+│   │   └── metadata.desktop
+│   └── v6
+│       ├── metadata.desktop
+│       └── metadata.json
+├── plasma5.1_main_qml
+├── plasma5.2_main_qml
+├── plasma5_main_qml
+├── plasma6_4_main.qml
+├── plasma6_main_qml
+├── plasma_reset.sh
+├── README.md
+├── support
+│   ├── debug_files_script.sh
+│   ├── diagnose.sh
+│   ├── FIX_SUMMARY.md
+│   ├── install_fixed.sh
+│   ├── PLASMA_6.4.md
+│   └── quick_fix.sh
+├── tree-git
+├── tree.git
+└── uninstall.sh
+
+7 directories, 34 files
