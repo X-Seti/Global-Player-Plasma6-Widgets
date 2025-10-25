@@ -20,6 +20,9 @@
 │   ├── v5
 │   │   └── metadata.desktop
 │   └── v6
+│       ├── contents
+│       │   └── ui
+│       │       └── plasma6_4_svg_icons.qml
 │       ├── metadata.desktop
 │       └── metadata.json
 ├── plasma5.1_main_qml
@@ -40,4 +43,4 @@
 ├── tree.git
 └── uninstall.sh
 
-7 directories, 34 files
+9 directories, 35 files
