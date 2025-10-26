@@ -209,15 +209,31 @@ PlasmoidItem {
 
     // D-Bus helper functions
     function qdbusCall(method, args) {
-        var cmd = "qdbus org.mooheda.gpd /org/mooheda/gpd org.mooheda.gpd1." + method
+        // Use Python D-Bus instead of qdbus command
+        var pythonCmd = "/usr/bin/python3 -c \""
+        pythonCmd += "import dbus, json, sys; "
+        pythonCmd += "bus = dbus.SessionBus(); "
+        pythonCmd += "obj = bus.get_object('org.mooheda.gpd', '/org/mooheda/gpd'); "
+        pythonCmd += "iface = dbus.Interface(obj, 'org.mooheda.gpd1'); "
+
         if (args && args.length > 0) {
+            // Method with arguments
+            var escapedArgs = []
             for (var i = 0; i < args.length; ++i) {
-                var a = ("" + args[i]).replace(/\"/g, "\\\"")
-                cmd += " \"" + a + "\""
+                var a = ("" + args[i]).replace(/'/g, "\\'")
+                escapedArgs.push("'" + a + "'")
             }
+            pythonCmd += "result = iface." + method + "(" + escapedArgs.join(", ") + "); "
+        } else {
+            // Method without arguments
+            pythonCmd += "result = iface." + method + "(); "
         }
-        console.log("D-Bus call:", cmd)
-        execDS.connectSource(cmd)
+
+        pythonCmd += "print(str(result))"
+        pythonCmd += "\""
+
+        console.log("D-Bus call:", method)
+        execDS.connectSource(pythonCmd)
     }
 
     function testDaemonConnection() {

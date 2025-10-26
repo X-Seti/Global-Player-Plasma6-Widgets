@@ -379,14 +379,38 @@ fi
 # Test D-Bus connection
 echo "[+] Testing D-Bus connection..."
 sleep 2
-if qdbus org.mooheda.gpd /org/mooheda/gpd >/dev/null 2>&1; then
-    echo "    ✓ D-Bus connection successful"
-    
+
+# Try qdbus first, fall back to Python if not available
+if command -v qdbus >/dev/null 2>&1 && qdbus org.mooheda.gpd /org/mooheda/gpd >/dev/null 2>&1; then
+    echo "    ✓ D-Bus connection successful (via qdbus)"
     STATIONS_JSON=$(qdbus org.mooheda.gpd /org/mooheda/gpd org.mooheda.gpd1.GetStations 2>/dev/null || echo "[]")
     STATION_COUNT=$(echo "$STATIONS_JSON" | python3 -c "import sys, json; print(len(json.loads(sys.stdin.read())))" 2>/dev/null || echo "0")
     echo "    ✓ Found $STATION_COUNT stations via D-Bus"
 else
-    echo "    ⚠️  D-Bus connection failed"
+    # Fallback to Python D-Bus
+    DBUS_TEST=$(python3 << 'PYEOF' 2>/dev/null
+import dbus
+import json
+try:
+    bus = dbus.SessionBus()
+    obj = bus.get_object('org.mooheda.gpd', '/org/mooheda/gpd')
+    iface = dbus.Interface(obj, 'org.mooheda.gpd1')
+    stations_str = iface.GetStations()
+    stations = json.loads(str(stations_str))
+    print(f"SUCCESS:{len(stations)}")
+except Exception as e:
+    print(f"FAILED:{e}")
+PYEOF
+)
+    
+    if echo "$DBUS_TEST" | grep -q "SUCCESS:"; then
+        STATION_COUNT=$(echo "$DBUS_TEST" | grep -oP 'SUCCESS:\K\d+')
+        echo "    ✓ D-Bus connection successful (via Python)"
+        echo "    ✓ Found $STATION_COUNT stations via D-Bus"
+    else
+        echo "    ⚠️  D-Bus connection failed"
+        echo "    Note: qdbus not available, using Python D-Bus"
+    fi
 fi
 
 # Clear caches
