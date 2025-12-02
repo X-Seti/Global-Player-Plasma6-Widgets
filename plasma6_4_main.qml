@@ -186,6 +186,11 @@ PlasmoidItem {
                     if (s.volume !== undefined) {
                         volumeSlider.value = s.volume
                     }
+                    
+                    // Initialize delay slider with saved delay
+                    if (s.playDelay !== undefined) {
+                        delaySlider.value = s.playDelay
+                    }
                 } catch (e) {
                     console.log("Error parsing GetState:", e)
                 }
@@ -636,13 +641,13 @@ PlasmoidItem {
                 }
                 
                 PC3.Label {
-                    text: mediaMode ? "Media Player" : (selectedStation || "No Station Selected")
+                    text: selectedStation || (mediaMode ? "Media Player" : "No Station Selected")
                     font.bold: true
                     font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 1.3
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
-                    visible: mediaMode || !daemonConnected
+                    visible: !mediaMode
                 }
 
                 PC3.Label {
@@ -709,12 +714,16 @@ PlasmoidItem {
                             id: volumeSlider
                             from: 0
                             to: 100
-                            value: 80  // Default volume
+                            value: 80  // Default volume will be updated from daemon state
                             stepSize: 5
                             implicitWidth: 100
                             onValueChanged: {
                                 // Send volume change to daemon
                                 qdbusCall("SetVolume", [value])
+                                // Refresh state to get updated volume
+                                if (daemonConnected) {
+                                    getState()
+                                }
                             }
                             PC3.ToolTip.text: "Volume: " + volumeSlider.value + "%"
                             PC3.ToolTip.visible: hovered
@@ -750,6 +759,42 @@ PlasmoidItem {
                 checked: pushNotifications
                 enabled: daemonConnected
                 onToggled: qdbusCall("SetNotifications", [checked ? "true" : "false"])
+            }
+            
+            // Play delay setting
+            RowLayout {
+                spacing: PlasmaCore.Units.smallSpacing
+                
+                Kirigami.Icon {
+                    source: "chronometer"
+                    width: PlasmaCore.Units.iconSizes.small
+                    height: PlasmaCore.Units.iconSizes.small
+                    color: PlasmaCore.Theme.textColor
+                }
+                
+                PC3.Slider {
+                    id: delaySlider
+                    from: 0
+                    to: 420
+                    value: 0  // Default delay
+                    stepSize: 10
+                    implicitWidth: 120
+                    onValueChanged: {
+                        // Send delay change to daemon
+                        qdbusCall("SetPlayDelay", [value])
+                        // Refresh state to get updated delay
+                        if (daemonConnected) {
+                            getState()
+                        }
+                    }
+                    PC3.ToolTip.text: "Play Delay: " + delaySlider.value + "ms"
+                    PC3.ToolTip.visible: hovered
+                }
+                
+                PC3.Label {
+                    text: delaySlider.value + "ms"
+                    font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                }
             }
             
             // Favorite button for current station
