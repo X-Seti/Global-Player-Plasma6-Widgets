@@ -180,6 +180,11 @@ PlasmoidItem {
                         stationIndex = stationsModel.indexOf(st)
                     }
                     daemonConnected = true
+                    
+                    // Initialize volume slider with saved volume
+                    if (s.volume !== undefined) {
+                        volumeSlider.value = s.volume
+                    }
                 } catch (e) {
                     console.log("Error parsing GetState:", e)
                 }
@@ -388,6 +393,20 @@ PlasmoidItem {
         addToHistory("Starting Global Player", "System")
         // Connection will be attempted by startupTimer
     }
+    
+    // Auto-refresh and play last station when expanded (from system tray)
+    onExpandedChanged: {
+        if (expanded && daemonConnected && selectedStation) {
+            // Refresh stations and play the currently selected station
+            refreshStations()
+            // Small delay to ensure stations are loaded before playing
+            Qt.callLater(function() {
+                if (selectedStation && stationsModel.length > 0) {
+                    playCurrent()
+                }
+            }, 500)
+        }
+    }
 
     // Compact panel representation
     compactRepresentation: Item {
@@ -568,6 +587,54 @@ PlasmoidItem {
                 Layout.fillWidth: true
                 spacing: PlasmaCore.Units.smallSpacing
 
+                // Station selection dropdown with cover art
+                PC3.ComboBox {
+                    id: stationCombo
+                    Layout.fillWidth: true
+                    model: stationsModel
+                    textRole: "name"
+                    currentIndex: stationIndex
+                    onActivated: {
+                        stationIndex = index
+                        playCurrent()
+                    }
+                    // Custom delegate to show station with potential cover art
+                    delegate: ItemDelegate {
+                        width: ListView.view.width
+                        contentItem: RowLayout {
+                            spacing: PlasmaCore.Units.smallSpacing
+                            
+                            // Placeholder for potential station artwork (could be enhanced in future)
+                            Rectangle {
+                                Layout.preferredWidth: PlasmaCore.Units.iconSizes.small
+                                Layout.preferredHeight: PlasmaCore.Units.iconSizes.small
+                                color: PlasmaCore.Theme.backgroundColor
+                                border.color: PlasmaCore.Theme.textColor
+                                border.width: 1
+                                radius: 2
+                                
+                                Kirigami.Icon {
+                                    anchors.centerIn: parent
+                                    source: "radio"
+                                    width: parent.width * 0.6
+                                    height: parent.height * 0.6
+                                }
+                            }
+                            
+                            PC3.Label {
+                                text: modelData
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                        }
+                        highlighted: ListView.isCurrentItem
+                    }
+                    // Show loading state when stations are not available
+                    placeholderText: stationsModel.length === 0 ? "Loading stations..." : "Select a station"
+                    visible: !mediaMode && daemonConnected
+                }
+                
                 PC3.Label {
                     text: mediaMode ? "Media Player" : (selectedStation || "No Station Selected")
                     font.bold: true
@@ -575,6 +642,7 @@ PlasmoidItem {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
+                    visible: mediaMode || !daemonConnected
                 }
 
                 PC3.Label {
@@ -625,6 +693,22 @@ PlasmoidItem {
                         PC3.ToolTip.text: "Next Station"
                         PC3.ToolTip.visible: hovered
                     }
+                    
+                    // Volume control slider
+                    PC3.Slider {
+                        id: volumeSlider
+                        from: 0
+                        to: 100
+                        value: 80  // Default volume
+                        stepSize: 5
+                        implicitWidth: 100
+                        onValueChanged: {
+                            // Send volume change to daemon
+                            qdbusCall("SetVolume", [value])
+                        }
+                        PC3.ToolTip.text: "Volume: " + volumeSlider.value + "%"
+                        PC3.ToolTip.visible: hovered
+                    }
                 }
 
                 PC3.Label {
@@ -655,6 +739,21 @@ PlasmoidItem {
                 checked: pushNotifications
                 enabled: daemonConnected
                 onToggled: qdbusCall("SetNotifications", [checked ? "true" : "false"])
+            }
+            
+            // Favorite button for current station
+            PC3.Button {
+                icon.name: "star"
+                text: "Favorite"
+                checkable: true
+                checked: false  // Will be updated based on favorites list
+                enabled: daemonConnected && selectedStation !== ""
+                onClicked: {
+                    // Toggle favorite status for current station
+                    console.log("Toggling favorite for:", selectedStation)
+                }
+                PC3.ToolTip.text: "Mark as favorite"
+                PC3.ToolTip.visible: hovered
             }
 
             Item { Layout.fillWidth: true }

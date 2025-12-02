@@ -60,6 +60,10 @@ class MPVPlayer:
             except Exception:
                 time.sleep(0.1)
 
+    def set_volume(self, volume):
+        if self.proc:
+            self._send({"command": ["set_property", "volume", volume]})
+
     def get_metadata(self):
         # Query MPV for 'metadata' property
         try:

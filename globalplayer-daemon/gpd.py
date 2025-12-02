@@ -28,7 +28,7 @@ def load_cfg():
             return json.load(open(CONFIG_FILE))
         except Exception:
             pass
-    return {"lastStation": "", "logging": False, "tokenStored": False}
+    return {"lastStation": "", "logging": False, "tokenStored": False, "volume": 80}
 
 def save_cfg(cfg):
     ensure_dirs()
@@ -151,6 +151,7 @@ class GlobalPlayerDaemon(dbus.service.Object):
         self.player = MPVPlayer()
         self.station = self.cfg.get("lastStation") or ""
         self.logging = bool(self.cfg.get("logging", False))
+        self.volume = int(self.cfg.get("volume", 80))  # Default volume 80%
         self.stations = discover_stations()
         self.cookies = kwallet_read("cookies") or ""
         self._md_lock = threading.Lock()
@@ -183,6 +184,30 @@ class GlobalPlayerDaemon(dbus.service.Object):
         self.cfg["logging"] = self.logging
         save_cfg(self.cfg)
         self._log_event(f"Logging enabled={self.logging}")
+
+    @dbus.service.method("org.mooheda.gpd1", in_signature="i")
+    def SetVolume(self, volume):
+        # Ensure volume is within valid range
+        volume = max(0, min(100, int(volume)))
+        self.volume = volume
+        self.cfg["volume"] = self.volume
+        save_cfg(self.cfg)
+        # Set volume in MPV player if it's playing
+        try:
+            self.player.set_volume(volume)
+        except Exception:
+            pass  # MPV might not be ready yet
+        self._log_event(f"Volume set to {volume}%")
+
+    @dbus.service.method("org.mooheda.gpd1", out_signature="i")
+    def GetVolume(self):
+        return self.volume
+
+    @dbus.service.method("org.mooheda.gpd1", in_signature="s")
+    def SetNotifications(self, enabled):
+        # This is a placeholder - in a real implementation, this would handle notification settings
+        enabled_bool = enabled.lower() in ['true', '1', 'yes', 'on']
+        self._log_event(f"Notifications {'enabled' if enabled_bool else 'disabled'}")
 
     @dbus.service.method("org.mooheda.gpd1", out_signature="s")
     def GetNowPlaying(self):
@@ -231,7 +256,9 @@ class GlobalPlayerDaemon(dbus.service.Object):
         payload = {
             "state": self.player.state,
             "station": self.station,
-            "logging": self.logging
+            "logging": self.logging,
+            "volume": self.volume,
+            "notifications": self.cookies != ""
         }
         return json.dumps(payload)
 
