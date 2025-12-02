@@ -631,8 +631,7 @@ PlasmoidItem {
                         }
                         highlighted: ListView.isCurrentItem
                     }
-                    // Show loading state when stations are not available
-                    placeholderText: stationsModel.length === 0 ? "Loading stations..." : "Select a station"
+                    // Show loading state when stations are not available - handled by model
                     visible: !mediaMode && daemonConnected
                 }
                 
@@ -695,20 +694,31 @@ PlasmoidItem {
                         PC3.ToolTip.visible: hovered
                     }
                     
-                    // Volume control slider
-                    PC3.Slider {
-                        id: volumeSlider
-                        from: 0
-                        to: 100
-                        value: 80  // Default volume
-                        stepSize: 5
-                        implicitWidth: 100
-                        onValueChanged: {
-                            // Send volume change to daemon
-                            qdbusCall("SetVolume", [value])
+                    // Volume control with icon
+                    RowLayout {
+                        spacing: PlasmaCore.Units.smallSpacing
+                        
+                        Kirigami.Icon {
+                            source: "player-volume"
+                            width: PlasmaCore.Units.iconSizes.smallMedium
+                            height: PlasmaCore.Units.iconSizes.smallMedium
+                            color: PlasmaCore.Theme.textColor
                         }
-                        PC3.ToolTip.text: "Volume: " + volumeSlider.value + "%"
-                        PC3.ToolTip.visible: hovered
+                        
+                        PC3.Slider {
+                            id: volumeSlider
+                            from: 0
+                            to: 100
+                            value: 80  // Default volume
+                            stepSize: 5
+                            implicitWidth: 100
+                            onValueChanged: {
+                                // Send volume change to daemon
+                                qdbusCall("SetVolume", [value])
+                            }
+                            PC3.ToolTip.text: "Volume: " + volumeSlider.value + "%"
+                            PC3.ToolTip.visible: hovered
+                        }
                     }
                 }
 
