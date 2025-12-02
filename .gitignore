@@ -1,51 +1,41 @@
 ```
-# Compiled and build artifacts
-*.pyc
-__pycache__/
-*.o
-*.obj
-
-# Dependencies
-.venv/
-venv/
-node_modules/
-
-# Logs and temp files
-*.log
-*.tmp
-*.swp
-
-# Environment
-.env
-.env.local
-.env.*
-
-# Editors
-.vscode/
-.idea/
-
-# System files
-.DS_Store
-Thumbs.db
-
-# Coverage
-coverage/
-htmlcov/
-.coverage
-
-# MyPy
-.mypy_cache/
-
-# Pytest
-.pytest_cache/
+# QML/Plasma build artifacts
+*.qmlc
+*.qmltypes
+*.qmlimport
 
 # Build directories
 build/
 dist/
-target/
-.gradle/
+cmake-build-*/
 
-# Compressed files
+# Dependencies
+node_modules/
+vendor/
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs and temp files
+*.log
+*.tmp
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Coverage and testing
+coverage/
+htmlcov/
+*.coverage
+.pytest_cache/
+.mypy_cache/
+
+# Compression files
 *.zip
 *.gz
 *.tar
