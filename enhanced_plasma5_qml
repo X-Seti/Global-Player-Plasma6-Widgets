@@ -1,0 +1,666 @@
+// X-Seti - Sept 15 2025 - Global Player - Plasma 5 with D-Bus Integration
+import QtQuick 2.15
+import QtQuick.Layouts 1.15
+import QtQuick.Controls 2.15
+import org.kde.plasma.core 2.0 as PlasmaCore
+import org.kde.plasma.components 3.0 as PC3
+import org.kde.plasma.plasmoid 2.0
+import org.kde.plasma.plasma5support 2.0 as Plasma5Support
+
+Item {
+    id: root
+
+    // D-Bus integrated state (from Plasma 6 version)
+    property var stationsModel: []
+    property int stationIndex: 0
+    property string selectedStation: {
+        if (stationsModel.length === 0) return ""
+        if (stationIndex < 0 || stationIndex >= stationsModel.length) return ""
+        return stationsModel[stationIndex]
+    }
+    property string nowArtist: ""
+    property string nowTitle: ""
+    property string nowShow: ""
+    property string playState: "Stopped"
+    property bool loggingEnabled: false
+    property bool pushNotifications: false
+    property url artworkUrl: ""
+
+    // UI state (keeping Plasma 5 features)
+    property bool mediaMode: false // false = radio, true = local media
+    property bool isPlaying: playState === "Playing"
+    
+    // Computed properties for display
+    property string displayTitle: {
+        if (nowArtist && nowTitle) {
+            return nowArtist + " – " + nowTitle
+        } else if (nowTitle) {
+            return nowTitle
+        } else if (selectedStation) {
+            return selectedStation
+        } else {
+            return "Global Player"
+        }
+    }
+
+    property string nowPlaying: {
+        if (nowArtist && nowTitle) {
+            return nowArtist + " - " + nowTitle
+        } else if (nowTitle) {
+            return nowTitle
+        } else {
+            return "Loading..."
+        }
+    }
+
+    // Song history (keeping Plasma 5 feature)
+    property var playedSongs: []
+    
+    // Media player state (keeping Plasma 5 feature)
+    property var mediaPlaylist: []
+    property int mediaIndex: 0
+    property int mediaPosition: 0
+    property int mediaDuration: 0
+
+    // Poll metadata every 10s (from Plasma 6 version)
+    Timer {
+        id: pollTimer
+        interval: 10000
+        running: true
+        repeat: true
+        onTriggered: {
+            getNowPlaying()
+        }
+    }
+
+    // D-Bus Data Source (ported from Plasma 6)
+    Plasma5Support.DataSource {
+        id: execDS
+        engine: "executable"
+
+        onNewData: function(sourceName, data) {
+            var out = (data["stdout"] || "").trim()
+            var err = (data["stderr"] || "").trim()
+
+            if (err) {
+                console.log("Command error:", err)
+            }
+
+            if (sourceName.indexOf("GetNowPlaying") !== -1) {
+                try {
+                    var m = JSON.parse(out)
+                    nowArtist = m.artist || ""
+                    nowTitle = m.title || ""
+                    nowShow = m.show || ""
+                    playState = m.state || playState
+                    if (m.artworkPath) {
+                        artworkUrl = "file://" + m.artworkPath
+                    } else {
+                        artworkUrl = ""
+                    }
+
+                    // Add to history when in radio mode
+                    if (!mediaMode && (nowArtist || nowTitle)) {
+                        addToHistory(nowTitle, nowArtist)
+                    }
+
+                } catch (e) {
+                    console.log("Error parsing GetNowPlaying:", e)
+                }
+            } else if (sourceName.indexOf("GetState") !== -1) {
+                try {
+                    var s = JSON.parse(out)
+                    playState = s.state || playState
+                    loggingEnabled = s.logging === true
+                    pushNotifications = s.notifications === true
+                    var st = s.station || ""
+                    if (st.length > 0 && stationsModel.indexOf(st) >= 0) {
+                        stationIndex = stationsModel.indexOf(st)
+                    }
+                } catch (e) {
+                    console.log("Error parsing GetState:", e)
+                }
+            } else if (sourceName.indexOf("GetStations") !== -1) {
+                try {
+                    var arr = JSON.parse(out)
+                    stationsModel = arr
+                    if (arr.length > 0 && stationIndex >= arr.length) {
+                        stationIndex = 0
+                    }
+                } catch (e) {
+                    console.log("Error parsing GetStations:", e)
+                }
+            }
+            disconnectSource(sourceName)
+        }
+            }
+    }
+
+    // D-Bus helper functions (ported from Plasma 6)
+    function qdbusCall(method, args) {
+        var cmd = "qdbus org.mooheda.gpd /org/mooheda/gpd org.mooheda.gpd1." + method
+        if (args && args.length > 0) {
+            for (var i = 0; i < args.length; ++i) {
+                var a = ("" + args[i]).replace(/\"/g, "\\\"")
+                cmd += " \"" + a + "\""
+            }
+        }
+        execDS.connectSource(cmd)
+    }
+
+    function getNowPlaying() {
+        if (!mediaMode) {
+            qdbusCall("GetNowPlaying", [])
+        }
+    }
+
+    function getState() {
+        qdbusCall("GetState", [])
+    }
+
+    function refreshStations() {
+        qdbusCall("GetStations", [])
+    }
+
+    function signIn() {
+        qdbusCall("SignIn", [])
+    }
+
+    // Simplified hotkey handling (removed complex registration to avoid syntax issues)
+    function handleGlobalHotkey(action) {
+        console.log("Global hotkey activated:", action)
+        
+        if (action === "play-pause" || action === "playpause") {
+            togglePlay()
+        } else if (action === "stop") {
+            stopPlayback()
+        } else if (action === "next") {
+            nextStation()
+        } else if (action === "previous" || action === "prev") {
+            prevStation()
+        } else if (action === "mode-toggle") {
+            switchMode()
+        } else if (action === "refresh") {
+            if (!mediaMode) {
+                refreshStations()
+            }
+        }
+    }
+
+    // Enhanced control functions
+    function togglePlay() {
+        if (mediaMode) {
+            // Local media mode - keep existing simulation
+            isPlaying = !isPlaying
+            if (pushNotifications) {
+                console.log("Media:", isPlaying ? "Playing" : "Paused")
+            }
+        } else {
+            // Radio mode - use D-Bus
+            if (isPlaying) {
+                qdbusCall("Pause", [])
+            } else {
+                playCurrent()
+            }
+        }
+    }
+
+    function playCurrent() {
+        if (mediaMode) {
+            // Media mode
+            playState = "Playing"
+            console.log("Playing media file")
+        } else {
+            // Radio mode
+            if (stationsModel.length === 0) return
+            if (stationIndex < 0 || stationIndex >= stationsModel.length) {
+                stationIndex = 0
+            }
+            selectedStation = stationsModel[stationIndex]
+            qdbusCall("Play", [selectedStation])
+            if (!pollTimer.running) {
+                pollTimer.start()
+            }
+            getState()
+            getNowPlaying()
+        }
+    }
+
+    function stopPlayback() {
+        if (mediaMode) {
+            playState = "Stopped"
+            console.log("Stopped media playback")
+        } else {
+            // For radio, pause is effectively stop
+            qdbusCall("Pause", [])
+        }
+    }
+
+    function nextStation() {
+        if (mediaMode) {
+            // Media mode - next track
+            mediaIndex = (mediaIndex + 1) % Math.max(1, mediaPlaylist.length)
+            console.log("Next media track")
+        } else {
+            // Radio mode
+            if (stationsModel.length === 0) return
+            stationIndex = (stationIndex + 1) % stationsModel.length
+            playCurrent()
+        }
+    }
+
+    function prevStation() {
+        if (mediaMode) {
+            // Media mode - previous track
+            mediaIndex = (mediaIndex - 1 + Math.max(1, mediaPlaylist.length)) % Math.max(1, mediaPlaylist.length)
+            console.log("Previous media track")
+        } else {
+            // Radio mode
+            if (stationsModel.length === 0) return
+            stationIndex = (stationIndex - 1 + stationsModel.length) % stationsModel.length
+            playCurrent()
+        }
+    }
+
+    function switchMode() {
+        mediaMode = !mediaMode
+        console.log("Switched to", mediaMode ? "Media Player" : "Radio", "mode")
+        
+        if (mediaMode) {
+            // Entering media mode - pause radio
+            if (playState === "Playing") {
+                qdbusCall("Pause", [])
+            }
+        } else {
+            // Entering radio mode - refresh stations
+            refreshStations()
+            getState()
+        }
+    }
+
+    // History management (keeping Plasma 5 feature)
+    function addToHistory(song, artist) {
+        var newSong = {
+            "time": new Date().toLocaleTimeString(),
+            "song": song || "Unknown Song",
+            "artist": artist || "Unknown Artist", 
+            "station": mediaMode ? "Local Media" : selectedStation
+        }
+        
+        // Avoid duplicates
+        if (playedSongs.length > 0) {
+            var last = playedSongs[0]
+            if (last.song === newSong.song && last.artist === newSong.artist) {
+                return // Skip duplicate
+            }
+        }
+        
+        playedSongs.unshift(newSong)
+        if (playedSongs.length > 10) {
+            playedSongs.pop()
+        }
+        playedSongsModel.clear()
+        for (var i = 0; i < playedSongs.length; i++) {
+            playedSongsModel.append(playedSongs[i])
+        }
+    }
+
+    // Song history model
+    ListModel {
+        id: playedSongsModel
+    }
+
+    // Startup (ported from Plasma 6)
+    Component.onCompleted: {
+        console.log("Global Player Plasma 5 started with D-Bus integration")
+        refreshStations()
+        getState()
+        pollTimer.start()
+        addToHistory("Welcome to Global Player", "System")
+    }
+
+    // PANEL MODE - Just the cover art icon (enhanced)
+    Rectangle {
+        visible: plasmoid.formFactor === PlasmaCore.Types.Horizontal || plasmoid.formFactor === PlasmaCore.Types.Vertical
+        anchors.fill: parent
+        anchors.margins: 2
+        radius: 4
+        color: "#2a2a2a"
+        border.color: isPlaying ? "#4CAF50" : "#666"
+        border.width: 2
+
+        // Cover art or music note
+        Image {
+            anchors.fill: parent
+            anchors.margins: 4
+            source: artworkUrl
+            fillMode: Image.PreserveAspectFit
+            visible: artworkUrl !== ""
+        }
+
+        PC3.Label {
+            anchors.centerIn: parent
+            text: mediaMode ? "♫" : "♪"
+            font.pointSize: 16
+            color: "#fff"
+            visible: artworkUrl === ""
+        }
+
+        // Playing indicator overlay
+        Rectangle {
+            anchors.bottom: parent.bottom
+            anchors.right: parent.right
+            anchors.margins: 1
+            width: 8
+            height: 8
+            radius: 4
+            color: isPlaying ? "#4CAF50" : "#666"
+            opacity: 0.8
+        }
+
+        // Click handlers
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            
+            onClicked: function(mouse) {
+                if (mouse.button === Qt.LeftButton) {
+                    togglePlay()
+                } else if (mouse.button === Qt.RightButton) {
+                    nextStation()
+                }
+            }
+        }
+    }
+
+    // DESKTOP MODE - Full interface (enhanced with D-Bus)
+    ColumnLayout {
+        visible: !(plasmoid.formFactor === PlasmaCore.Types.Horizontal || plasmoid.formFactor === PlasmaCore.Types.Vertical)
+        anchors.fill: parent
+        anchors.margins: 16
+        spacing: 12
+
+        // Top section - Cover art and station info
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 16
+
+            // Cover art (left side)
+            Rectangle {
+                Layout.preferredWidth: 120
+                Layout.preferredHeight: 120
+                radius: 8
+                color: "#2a2a2a"
+                border.color: isPlaying ? "#4CAF50" : "#666"
+                border.width: 2
+
+                Image {
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    source: artworkUrl
+                    fillMode: Image.PreserveAspectFit
+                    visible: artworkUrl !== ""
+                }
+
+                PC3.Label {
+                    anchors.centerIn: parent
+                    text: mediaMode ? "♫" : "♪"
+                    font.pointSize: 32
+                    color: "#fff"
+                    visible: artworkUrl === ""
+                }
+            }
+
+            // Station info and controls - REORGANIZED LAYOUT
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                // Line 1: Station name (centered)
+                PC3.Label {
+                    text: mediaMode ? "Media Player" : (selectedStation || "Loading...")
+                    font.bold: true
+                    font.pointSize: 16
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                }
+
+                // Line 2: Now playing / Song info (centered)
+                PC3.Label {
+                    Layout.fillWidth: true
+                    text: mediaMode ? "Local Media Playback" : nowPlaying
+                    font.pointSize: 12
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                }
+
+                // Line 3: Navigation arrows (left/right of center)
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: 12
+
+                    PC3.Button {
+                        text: "◀"
+                        onClicked: prevStation()
+                        enabled: mediaMode || stationsModel.length > 1
+                    }
+
+                    PC3.Button {
+                        text: "▶"
+                        onClicked: nextStation()
+                        enabled: mediaMode || stationsModel.length > 1
+                    }
+                }
+
+                // Line 4: Playback controls (centered)
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: 8
+
+                    PC3.Button {
+                        text: "⏮"
+                        onClicked: prevStation()
+                        enabled: mediaMode || stationsModel.length > 1
+                    }
+
+                    PC3.Button {
+                        text: isPlaying ? "⏸" : "▶️"
+                        font.pointSize: 14
+                        onClicked: togglePlay()
+                    }
+
+                    PC3.Button {
+                        text: "⏹"
+                        onClicked: stopPlayback()
+                        enabled: isPlaying
+                    }
+
+                    PC3.Button {
+                        text: "⏭"
+                        onClicked: nextStation()
+                        enabled: mediaMode || stationsModel.length > 1
+                    }
+                }
+            }
+        }
+
+        // Options row
+        RowLayout {
+            Layout.fillWidth: true
+
+            PC3.CheckBox {
+                text: "Logging"
+                checked: loggingEnabled
+                onToggled: qdbusCall("SetLogging", [checked ? "true" : "false"])
+            }
+
+            PC3.CheckBox {
+                text: "Notifications"
+                checked: pushNotifications
+                onToggled: qdbusCall("SetNotifications", [checked ? "true" : "false"])
+            }
+
+            Item { Layout.fillWidth: true }
+
+            PC3.Button {
+                text: mediaMode ? "Radio Mode" : "Media Mode"
+                onClicked: switchMode()
+            }
+
+            PC3.Button {
+                text: "↻"
+                onClicked: refreshStations()
+                enabled: !mediaMode
+            }
+
+            PC3.Button {
+                text: "Sign In"
+                onClicked: signIn()
+                enabled: !mediaMode
+            }
+        }
+
+        // Song history / Media player area
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.minimumHeight: 200
+            color: "#1a1a1a"
+            radius: 8
+            border.color: "#444"
+            border.width: 1
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 12
+
+                PC3.Label {
+                    text: mediaMode ? "Media Player Controls" : "Recently Played Songs"
+                    font.bold: true
+                    color: "#fff"
+                }
+
+                // Radio mode - song history (enhanced with real data)
+                ScrollView {
+                    visible: !mediaMode
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    ListView {
+                        model: playedSongsModel
+                        delegate: RowLayout {
+                            width: ListView.view.width
+                            spacing: 8
+
+                            PC3.Label {
+                                text: model.time || ""
+                                color: "#888"
+                                font.pointSize: 9
+                                Layout.preferredWidth: 60
+                            }
+
+                            PC3.Label {
+                                text: (model.artist || "") + " - " + (model.song || "")
+                                color: "#fff"
+                                Layout.fillWidth: true
+                                elide: Text.ElideRight
+                            }
+
+                            PC3.Label {
+                                text: model.station || ""
+                                color: "#4CAF50"
+                                font.pointSize: 9
+                                Layout.preferredWidth: 100
+                                elide: Text.ElideRight
+                            }
+                        }
+                    }
+                }
+
+                // Media mode - player controls (keeping Plasma 5 feature)
+                ColumnLayout {
+                    visible: mediaMode
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    PC3.Label {
+                        text: "Local MP3/MP4 Player"
+                        color: "#fff"
+                        horizontalAlignment: Text.AlignHCenter
+                        Layout.fillWidth: true
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignHCenter
+
+                        PC3.Button {
+                            text: "⏮"
+                            onClicked: prevStation()
+                        }
+
+                        PC3.Button {
+                            text: isPlaying ? "⏸" : "▶️"
+                            onClicked: togglePlay()
+                        }
+
+                        PC3.Button {
+                            text: "⏹"
+                            onClicked: stopPlayback()
+                        }
+
+                        PC3.Button {
+                            text: "⏭"
+                            onClicked: nextStation()
+                        }
+                    }
+
+                    // Progress bar placeholder
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: 6
+                        color: "#333"
+                        radius: 3
+
+                        Rectangle {
+                            width: parent.width * (mediaPosition / Math.max(1, mediaDuration))
+                            height: parent.height
+                            color: "#4CAF50"
+                            radius: 3
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+
+                        PC3.Label {
+                            text: Math.floor(mediaPosition / 60) + ":" + String(mediaPosition % 60).padStart(2, '0')
+                            color: "#888"
+                            font.pointSize: 9
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        PC3.Label {
+                            text: Math.floor(mediaDuration / 60) + ":" + String(mediaDuration % 60).padStart(2, '0')
+                            color: "#888"
+                            font.pointSize: 9
+                        }
+                    }
+
+                    PC3.Label {
+                        text: mediaMode ? "Ready for your media files..." : ""
+                        color: "#666"
+                        horizontalAlignment: Text.AlignHCenter
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        verticalAlignment: Text.AlignVCenter
+                        visible: mediaMode
+                    }
+                }
+            }
+        }
+    }
+}
