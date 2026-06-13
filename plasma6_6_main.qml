@@ -537,13 +537,14 @@ PlasmoidItem {
         // -- Error banner --
         Rectangle {
             id: errorBanner
-            visible: !daemonConnected || errorMessage !== ""
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
-            height: PlasmaCore.Units.gridUnit * 2
+            height: (!daemonConnected || errorMessage !== "") ? PlasmaCore.Units.gridUnit * 2 : 0
+            visible: height > 0
             color: PlasmaCore.Theme.negativeBackgroundColor
             radius: PlasmaCore.Units.smallSpacing
+            clip: true
 
             RowLayout {
                 anchors.fill: parent
@@ -571,7 +572,7 @@ PlasmoidItem {
         // -- Artwork box --
         Rectangle {
             id: artworkBox
-            anchors.top: errorBanner.visible ? errorBanner.bottom : parent.top
+            anchors.top: errorBanner.bottom
             anchors.topMargin: PlasmaCore.Units.smallSpacing
             anchors.left: parent.left
             anchors.leftMargin: PlasmaCore.Units.smallSpacing
