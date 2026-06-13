@@ -438,10 +438,10 @@ PlasmoidItem {
             anchors.fill: parent
             anchors.margins: 1
             radius: 3
-            color: PlasmaCore.Theme.backgroundColor
+            color: Kirigami.Theme.backgroundColor
             border.color: {
-                if (!daemonConnected) return PlasmaCore.Theme.negativeTextColor
-                return isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.textColor
+                if (!daemonConnected) return Kirigami.Theme.negativeTextColor
+                return isPlaying ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.textColor
             }
             border.width: 2
 
@@ -459,8 +459,8 @@ PlasmoidItem {
                     if (!daemonConnected) return "?"
                     return mediaMode ? "♫" : "♪"
                 }
-                font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 0.8
-                color: PlasmaCore.Theme.textColor
+                font.pointSize: Kirigami.Theme.defaultFont.pointSize * 0.8
+                color: Kirigami.Theme.textColor
                 visible: artworkUrl === ""
             }
 
@@ -473,8 +473,8 @@ PlasmoidItem {
                 height: 6
                 radius: 3
                 color: {
-                    if (!daemonConnected) return PlasmaCore.Theme.negativeTextColor
-                    return isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.neutralTextColor
+                    if (!daemonConnected) return Kirigami.Theme.negativeTextColor
+                    return isPlaying ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.neutralTextColor
                 }
                 opacity: 0.9
             }
@@ -540,7 +540,7 @@ PlasmoidItem {
             visible: !daemonConnected || errorMessage !== ""
             Layout.fillWidth: true
             height: PlasmaCore.Units.gridUnit * 2
-            color: PlasmaCore.Theme.negativeBackgroundColor
+            color: Kirigami.Theme.negativeBackgroundColor
             radius: PlasmaCore.Units.smallSpacing
 
             RowLayout {
@@ -549,12 +549,12 @@ PlasmoidItem {
 
                 PC3.Label {
                     text: "⚠️"
-                    font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 1.2
+                    font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.2
                 }
 
                 PC3.Label {
                     text: errorMessage !== "" ? errorMessage : "Daemon not connected - check service status"
-                    color: PlasmaCore.Theme.negativeTextColor
+                    color: Kirigami.Theme.negativeTextColor
                 }
 
                 PC3.Button {
@@ -594,8 +594,8 @@ PlasmoidItem {
                 Layout.maximumWidth: PlasmaCore.Units.gridUnit * 8
                 Layout.alignment: Qt.AlignVCenter | Qt.AlignLeft
                 radius: PlasmaCore.Units.smallSpacing
-                color: PlasmaCore.Theme.complementaryBackgroundColor
-                border.color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.disabledTextColor
+                color: Kirigami.Theme.complementaryBackgroundColor
+                border.color: isPlaying ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.disabledTextColor
                 border.width: 2
 
                 Image {
@@ -641,8 +641,8 @@ PlasmoidItem {
                             Rectangle {
                                 Layout.preferredWidth: PlasmaCore.Units.iconSizes.small
                                 Layout.preferredHeight: PlasmaCore.Units.iconSizes.small
-                                color: PlasmaCore.Theme.backgroundColor
-                                border.color: PlasmaCore.Theme.textColor
+                                color: Kirigami.Theme.backgroundColor
+                                border.color: Kirigami.Theme.textColor
                                 border.width: 1
                                 radius: 2
                                 
@@ -670,7 +670,7 @@ PlasmoidItem {
                 PC3.Label {
                     text: selectedStation || (mediaMode ? "Media Player" : "No Station Selected")
                     font.bold: true
-                    font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 1.3
+                    font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.3
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
@@ -680,7 +680,7 @@ PlasmoidItem {
                 PC3.Label {
                     Layout.fillWidth: true
                     text: nowPlaying
-                    font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 1.1
+                    font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.1
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
                     maximumLineCount: 2
@@ -702,7 +702,7 @@ PlasmoidItem {
 
                     PC3.Button {
                         text: isPlaying ? "⏸" : "▶️"
-                        font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 1.2
+                        font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.2
                         onClicked: togglePlay()
                         enabled: daemonConnected
                         highlighted: isPlaying
@@ -734,7 +734,7 @@ PlasmoidItem {
                             source: "player-volume"
                             width: PlasmaCore.Units.iconSizes.smallMedium
                             height: PlasmaCore.Units.iconSizes.smallMedium
-                            color: PlasmaCore.Theme.textColor
+                            color: Kirigami.Theme.textColor
                         }
                         
                         PC3.Slider {
@@ -761,7 +761,7 @@ PlasmoidItem {
                 PC3.Label {
                     visible: stationsModel.length > 0
                     text: "Station " + (stationIndex + 1) + " of " + stationsModel.length
-                    font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                    font.pointSize: Kirigami.Theme.smallestFont.pointSize
                     opacity: 0.7
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
@@ -816,7 +816,7 @@ PlasmoidItem {
                                         var v = vuMeter.barHeights[index]
                                         if (v > 0.85) return "#ff3b30"
                                         if (v > 0.60) return "#ff9f0a"
-                                        return PlasmaCore.Theme.positiveTextColor
+                                        return Kirigami.Theme.positiveTextColor
                                     }
                                     Behavior on height {
                                         NumberAnimation { duration: 80; easing.type: Easing.OutQuad }
@@ -856,7 +856,7 @@ PlasmoidItem {
                     source: "chronometer"
                     width: PlasmaCore.Units.iconSizes.small
                     height: PlasmaCore.Units.iconSizes.small
-                    color: PlasmaCore.Theme.textColor
+                    color: Kirigami.Theme.textColor
                 }
                 
                 PC3.Slider {
@@ -880,7 +880,7 @@ PlasmoidItem {
                 
                 PC3.Label {
                     text: delaySlider.value + "ms"
-                    font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                    font.pointSize: Kirigami.Theme.smallestFont.pointSize
                 }
             }
             
@@ -940,7 +940,7 @@ PlasmoidItem {
                     }
                     PC3.Label {
                         text: "Global Player v3.3"
-                        font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                        font.pointSize: Kirigami.Theme.smallestFont.pointSize
                         opacity: 0.6
                     }
                 }
@@ -958,7 +958,7 @@ PlasmoidItem {
                         PC3.Label {
                             text: model.time || ""
                             opacity: 0.7
-                            font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                            font.pointSize: Kirigami.Theme.smallestFont.pointSize
                             Layout.preferredWidth: PlasmaCore.Units.gridUnit * 3
                         }
 
@@ -966,13 +966,13 @@ PlasmoidItem {
                             text: (model.artist || "") + " - " + (model.song || "")
                             Layout.fillWidth: true
                             elide: Text.ElideRight
-                            font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                            font.pointSize: Kirigami.Theme.smallestFont.pointSize
                         }
 
                         PC3.Label {
                             text: model.station || ""
-                            color: PlasmaCore.Theme.positiveTextColor
-                            font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                            color: Kirigami.Theme.positiveTextColor
+                            font.pointSize: Kirigami.Theme.smallestFont.pointSize
                             Layout.preferredWidth: PlasmaCore.Units.gridUnit * 5
                             elide: Text.ElideRight
                         }
