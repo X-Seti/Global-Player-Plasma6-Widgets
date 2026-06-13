@@ -580,15 +580,13 @@ PlasmoidItem {
             spacing: PlasmaCore.Units.largeSpacing
 
             Rectangle {
-                width: PlasmaCore.Units.gridUnit * 8
-                height: PlasmaCore.Units.gridUnit * 8
                 Layout.preferredWidth: PlasmaCore.Units.gridUnit * 8
                 Layout.preferredHeight: PlasmaCore.Units.gridUnit * 8
                 Layout.minimumWidth: PlasmaCore.Units.gridUnit * 8
                 Layout.minimumHeight: PlasmaCore.Units.gridUnit * 8
                 Layout.alignment: Qt.AlignTop
                 radius: PlasmaCore.Units.smallSpacing
-                color: PlasmaCore.Theme.backgroundColor
+                color: "transparent"
                 border.color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.textColor
                 border.width: 2
 
@@ -633,7 +631,7 @@ PlasmoidItem {
                             Rectangle {
                                 Layout.preferredWidth: PlasmaCore.Units.iconSizes.small
                                 Layout.preferredHeight: PlasmaCore.Units.iconSizes.small
-                                color: PlasmaCore.Theme.backgroundColor
+                                color: "transparent"
                                 border.color: PlasmaCore.Theme.textColor
                                 border.width: 1
                                 radius: 2
@@ -853,14 +851,9 @@ PlasmoidItem {
         }
 
         // Song history
-        Rectangle {
+        Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            color: PlasmaCore.Theme.backgroundColor
-            radius: PlasmaCore.Units.smallSpacing
-            border.color: PlasmaCore.Theme.textColor
-            border.width: 1
-            opacity: 0.8
 
             ColumnLayout {
                 anchors.fill: parent
