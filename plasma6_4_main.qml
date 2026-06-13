@@ -613,7 +613,6 @@ PlasmoidItem {
                     id: stationCombo
                     Layout.fillWidth: true
                     model: stationsModel
-                    textRole: "name"
                     currentIndex: stationIndex
                     onActivated: {
                         stationIndex = index
@@ -874,30 +873,41 @@ PlasmoidItem {
                     Layout.fillHeight: true
                     clip: true
                     model: playedSongsModel
-                    delegate: RowLayout {
+                    delegate: Item {
                         width: ListView.view ? ListView.view.width : 0
-                        spacing: PlasmaCore.Units.smallSpacing
+                        height: PlasmaCore.Units.gridUnit * 1.4
 
                         PC3.Label {
+                            id: timeLabel
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
                             text: model.time || ""
                             opacity: 0.7
                             font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
-                            Layout.preferredWidth: PlasmaCore.Units.gridUnit * 3
+                            width: PlasmaCore.Units.gridUnit * 3
                         }
 
                         PC3.Label {
-                            text: (model.artist || "") + " - " + (model.song || "")
-                            Layout.fillWidth: true
-                            elide: Text.ElideRight
-                            font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
-                        }
-
-                        PC3.Label {
+                            id: stationLabel
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
                             text: model.station || ""
                             color: PlasmaCore.Theme.positiveTextColor
                             font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
-                            Layout.preferredWidth: PlasmaCore.Units.gridUnit * 5
+                            width: PlasmaCore.Units.gridUnit * 5
                             elide: Text.ElideRight
+                            horizontalAlignment: Text.AlignRight
+                        }
+
+                        PC3.Label {
+                            anchors.left: timeLabel.right
+                            anchors.right: stationLabel.left
+                            anchors.leftMargin: PlasmaCore.Units.smallSpacing
+                            anchors.rightMargin: PlasmaCore.Units.smallSpacing
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: (model.artist || "") + " - " + (model.song || "")
+                            elide: Text.ElideRight
+                            font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
                         }
                     }
                 }
