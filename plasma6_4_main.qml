@@ -384,21 +384,22 @@ PlasmoidItem {
         var newSong = {
             "time": new Date().toLocaleTimeString(),
             "song": song || "Unknown Song",
-            "artist": artist || "Unknown Artist", 
-            "station": mediaMode ? "Local Media" : selectedStation
+            "artist": artist || "Unknown Artist",
+            "station": mediaMode ? "Local Media" : (selectedStation || "")
         }
-        
+
         if (playedSongs.length > 0) {
             var last = playedSongs[0]
             if (last.song === newSong.song && last.artist === newSong.artist) {
                 return
             }
         }
-        
-        playedSongs.unshift(newSong)
-        if (playedSongs.length > 10) {
-            playedSongs.pop()
-        }
+
+        var arr = playedSongs.slice()
+        arr.unshift(newSong)
+        if (arr.length > 10) arr.pop()
+        playedSongs = arr
+
         playedSongsModel.clear()
         for (var i = 0; i < playedSongs.length; i++) {
             playedSongsModel.append(playedSongs[i])
@@ -407,9 +408,11 @@ PlasmoidItem {
 
     // Component initialization
     Component.onCompleted: {
-        console.log("Global Player Plasma 6.4 initializing...")
-        addToHistory("Starting Global Player", "System")
-        // Connection will be attempted by startupTimer
+        console.log("Global Player initializing...")
+        // Defer so ListModel is ready
+        Qt.callLater(function() {
+            addToHistory("Global Player ready", "System")
+        })
     }
     
     // Auto-refresh on expand
@@ -921,77 +924,78 @@ PlasmoidItem {
             }
         }
 
-        // Song history
-        Item {
+        // Song history header
+        RowLayout {
+            Layout.fillWidth: true
+
+            PC3.Label {
+                text: mediaMode ? "Media Player" : "Recently Played"
+                font.bold: true
+                Layout.fillWidth: true
+            }
+
+            PC3.Label {
+                text: "Global Player v3.3"
+                font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                opacity: 0.6
+            }
+        }
+
+        // Song history list
+        ListView {
+            visible: !mediaMode
             Layout.fillWidth: true
             Layout.fillHeight: true
-
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: PlasmaCore.Units.smallSpacing
-                spacing: PlasmaCore.Units.smallSpacing
+            Layout.minimumHeight: PlasmaCore.Units.gridUnit * 8
+            clip: true
+            model: playedSongsModel
+            delegate: Item {
+                width: ListView.view ? ListView.view.width : 0
+                height: PlasmaCore.Units.gridUnit * 2
 
                 PC3.Label {
-                    text: (mediaMode ? "Media Player" : "Recently Played") + "  |  Global Player v3.3"
-                    font.bold: true
-                }
-
-                ListView {
-                    visible: !mediaMode
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Layout.minimumHeight: PlasmaCore.Units.gridUnit * 8
-                    clip: true
-                    model: playedSongsModel
-                    delegate: Item {
-                        width: ListView.view ? ListView.view.width : 0
-                        height: PlasmaCore.Units.gridUnit * 2
-
-                        PC3.Label {
-                            id: timeLabel
-                            anchors.left: parent.left
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: model.time || ""
-                            opacity: 0.7
-                            font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
-                            width: PlasmaCore.Units.gridUnit * 3
-                        }
-
-                        PC3.Label {
-                            id: stationLabel
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: model.station || ""
-                            color: PlasmaCore.Theme.positiveTextColor
-                            font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
-                            width: PlasmaCore.Units.gridUnit * 5
-                            elide: Text.ElideRight
-                            horizontalAlignment: Text.AlignRight
-                        }
-
-                        PC3.Label {
-                            anchors.left: timeLabel.right
-                            anchors.right: stationLabel.left
-                            anchors.leftMargin: PlasmaCore.Units.smallSpacing
-                            anchors.rightMargin: PlasmaCore.Units.smallSpacing
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: (model.artist || "") + " - " + (model.song || "")
-                            elide: Text.ElideRight
-                            font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
-                        }
-                    }
+                    id: timeLabel
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: model.time || ""
+                    opacity: 0.7
+                    font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                    width: PlasmaCore.Units.gridUnit * 3
                 }
 
                 PC3.Label {
-                    visible: mediaMode
-                    text: "Media mode - not yet implemented"
-                    horizontalAlignment: Text.AlignHCenter
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    verticalAlignment: Text.AlignVCenter
-                    opacity: 0.5
+                    id: stationLabel
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: model.station || ""
+                    color: PlasmaCore.Theme.positiveTextColor
+                    font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                    width: PlasmaCore.Units.gridUnit * 5
+                    elide: Text.ElideRight
+                    horizontalAlignment: Text.AlignRight
+                }
+
+                PC3.Label {
+                    anchors.left: timeLabel.right
+                    anchors.right: stationLabel.left
+                    anchors.leftMargin: PlasmaCore.Units.smallSpacing
+                    anchors.rightMargin: PlasmaCore.Units.smallSpacing
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: (model.artist || "") + " - " + (model.song || "")
+                    elide: Text.ElideRight
+                    font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
                 }
             }
+        }
+
+        PC3.Label {
+            visible: mediaMode
+            text: "Media mode - not yet implemented"
+            horizontalAlignment: Text.AlignHCenter
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            verticalAlignment: Text.AlignVCenter
+            opacity: 0.5
         }
     }
 }
