@@ -192,14 +192,15 @@ select_plasma_version() {
     echo ""
     echo "Choose your Plasma version:"
     echo ""
-    echo "1) 🔍 Automatic Detection (Recommended)"
-    echo "2) 🔧 Plasma 5.x (Manual)"
-    echo "3) ⚙️  Plasma 6.0-6.3 (Original layout, Unicode symbols)"
-    echo "4) 🎨 Plasma 6.4+ (Original layout, SVG icons)"
+    echo "1) Automatic Detection (Recommended)"
+    echo "2) Plasma 5.x (Manual)"
+    echo "3) Plasma 6.0-6.3 (Original layout, Unicode symbols)"
+    echo "4) Plasma 6.4+ (SVG icons)"
+    echo "5) Plasma 6.6+ (Development build)"
     echo ""
     
     while true; do
-        read -p "Enter choice (1-4): " choice
+        read -p "Enter choice (1-5): " choice
         
         case $choice in
             1)
@@ -233,8 +234,13 @@ select_plasma_version() {
                 echo "[+] Selected: Plasma 6.4+ (SVG icons)"
                 break
                 ;;
+            5)
+                PLASMA_VERSION="6.6"
+                echo "[+] Selected: Plasma 6.6+ (Development build)"
+                break
+                ;;
             *)
-                echo "❌ Invalid choice. Please enter 1, 2, 3, or 4."
+                echo "Invalid choice. Please enter 1-5."
                 ;;
         esac
     done
@@ -300,7 +306,23 @@ fi
 # Install appropriate QML and metadata based on Plasma version
 echo "[+] Installing Plasma ${PLASMA_VERSION} files..."
 
-if [ "$PLASMA_VERSION" = "6.4" ]; then
+if [ "$PLASMA_VERSION" = "6.6" ]; then
+    # Plasma 6.6+ development build
+    if [ -f "$(dirname "$0")/plasma6_6_main.qml" ]; then
+        cp -f "$(dirname "$0")/plasma6_6_main.qml" "${PLASMOID_DST}/contents/ui/main.qml"
+        echo "    ✓ Plasma 6.6 QML (development build) installed"
+    else
+        echo "❌ Error: plasma6_6_main.qml not found!"
+        exit 1
+    fi
+    if [ -f "$(dirname "$0")/org.mooheda.globalplayer/v6/metadata.json" ]; then
+        cp "$(dirname "$0")/org.mooheda.globalplayer/v6/metadata.json" "${PLASMOID_DST}/metadata.json"
+    fi
+    if [ -f "$(dirname "$0")/org.mooheda.globalplayer/v6/metadata.desktop" ]; then
+        cp "$(dirname "$0")/org.mooheda.globalplayer/v6/metadata.desktop" "${PLASMOID_DST}/metadata.desktop"
+    fi
+
+elif [ "$PLASMA_VERSION" = "6.4" ]; then
     # Plasma 6.4+ with SVG icons
     
     if [ -f "$(dirname "$0")/plasma6_4_main.qml" ]; then
