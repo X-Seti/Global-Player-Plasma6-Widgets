@@ -575,21 +575,18 @@ PlasmoidItem {
         }
 
         // Top section - Cover art and controls
-        RowLayout {
+        Item {
             Layout.fillWidth: true
-            Layout.minimumHeight: PlasmaCore.Units.gridUnit * 8
-            spacing: PlasmaCore.Units.largeSpacing
+            Layout.preferredHeight: PlasmaCore.Units.gridUnit * 9
+            Layout.minimumHeight: PlasmaCore.Units.gridUnit * 9
 
+            // Artwork box - fixed position left
             Rectangle {
                 id: artworkBox
+                x: 0
+                y: 0
                 width: PlasmaCore.Units.gridUnit * 8
                 height: PlasmaCore.Units.gridUnit * 8
-                Layout.preferredWidth: PlasmaCore.Units.gridUnit * 8
-                Layout.preferredHeight: PlasmaCore.Units.gridUnit * 8
-                Layout.minimumWidth: PlasmaCore.Units.gridUnit * 8
-                Layout.minimumHeight: PlasmaCore.Units.gridUnit * 8
-                Layout.maximumWidth: PlasmaCore.Units.gridUnit * 8
-                Layout.alignment: Qt.AlignVCenter | Qt.AlignLeft
                 radius: PlasmaCore.Units.smallSpacing
                 color: PlasmaCore.Theme.complementaryBackgroundColor
                 border.color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.disabledTextColor
@@ -612,9 +609,13 @@ PlasmoidItem {
                 }
             }
 
+            // Controls column - anchored right of artwork
             ColumnLayout {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
+                anchors.left: artworkBox.right
+                anchors.leftMargin: PlasmaCore.Units.largeSpacing
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
                 spacing: PlasmaCore.Units.smallSpacing
 
                 // Station selection dropdown with cover art
