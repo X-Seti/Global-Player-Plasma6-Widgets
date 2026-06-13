@@ -594,8 +594,8 @@ PlasmoidItem {
                 Layout.maximumWidth: PlasmaCore.Units.gridUnit * 8
                 Layout.alignment: Qt.AlignVCenter | Qt.AlignLeft
                 radius: PlasmaCore.Units.smallSpacing
-                color: PlasmaCore.Theme.complementaryBackgroundColor
-                border.color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.disabledTextColor
+                color: PlasmaCore.Theme.backgroundColor
+                border.color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.highlightColor
                 border.width: 2
 
                 Image {
@@ -766,62 +766,62 @@ PlasmoidItem {
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
                 }
+            }
+        }
 
-                // VU meter - horizontal bars under buttons
-                Item {
-                    id: vuMeter
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: PlasmaCore.Units.gridUnit * 2
-                    Layout.minimumHeight: PlasmaCore.Units.gridUnit * 2
+        // VU meter - full width row, direct child of fullRepresentation
+        Item {
+            id: vuMeter
+            Layout.fillWidth: true
+            Layout.preferredHeight: PlasmaCore.Units.gridUnit * 2
+            Layout.minimumHeight: PlasmaCore.Units.gridUnit * 2
 
-                    property var barHeights: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
-                    property int barCount: 16
+            property var barHeights: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+            property int barCount: 16
 
-                    Timer {
-                        interval: 100
-                        running: isPlaying
-                        repeat: true
-                        onTriggered: {
-                            var h = []
-                            for (var i = 0; i < vuMeter.barCount; i++) {
-                                var prev = vuMeter.barHeights[i]
-                                var target = 0.1 + Math.random() * 0.9
-                                h.push(target > prev ? target : prev * 0.65)
-                            }
-                            vuMeter.barHeights = h
-                        }
-                        onRunningChanged: {
-                            if (!running) {
-                                var h = []
-                                for (var i = 0; i < vuMeter.barCount; i++) h.push(0)
-                                vuMeter.barHeights = h
-                            }
-                        }
+            Timer {
+                interval: 100
+                running: isPlaying
+                repeat: true
+                onTriggered: {
+                    var h = []
+                    for (var i = 0; i < vuMeter.barCount; i++) {
+                        var prev = vuMeter.barHeights[i]
+                        var target = 0.1 + Math.random() * 0.9
+                        h.push(target > prev ? target : prev * 0.65)
                     }
+                    vuMeter.barHeights = h
+                }
+                onRunningChanged: {
+                    if (!running) {
+                        var h = []
+                        for (var i = 0; i < vuMeter.barCount; i++) h.push(0)
+                        vuMeter.barHeights = h
+                    }
+                }
+            }
 
-                    Row {
-                        anchors.fill: parent
-                        spacing: 2
-                        Repeater {
-                            model: vuMeter.barCount
-                            delegate: Item {
-                                width: (vuMeter.width - (vuMeter.barCount - 1) * 2) / vuMeter.barCount
-                                height: vuMeter.height
-                                Rectangle {
-                                    width: parent.width
-                                    height: Math.max(2, parent.height * vuMeter.barHeights[index])
-                                    anchors.bottom: parent.bottom
-                                    radius: 1
-                                    color: {
-                                        var v = vuMeter.barHeights[index]
-                                        if (v > 0.85) return "#ff3b30"
-                                        if (v > 0.60) return "#ff9f0a"
-                                        return PlasmaCore.Theme.positiveTextColor
-                                    }
-                                    Behavior on height {
-                                        NumberAnimation { duration: 80; easing.type: Easing.OutQuad }
-                                    }
-                                }
+            Row {
+                anchors.fill: parent
+                spacing: 2
+                Repeater {
+                    model: vuMeter.barCount
+                    delegate: Item {
+                        width: (vuMeter.width - (vuMeter.barCount - 1) * 2) / vuMeter.barCount
+                        height: vuMeter.height
+                        Rectangle {
+                            width: parent.width
+                            height: Math.max(2, parent.height * vuMeter.barHeights[index])
+                            anchors.bottom: parent.bottom
+                            radius: 1
+                            color: {
+                                var v = vuMeter.barHeights[index]
+                                if (v > 0.85) return "#ff3b30"
+                                if (v > 0.60) return "#ff9f0a"
+                                return PlasmaCore.Theme.positiveTextColor
+                            }
+                            Behavior on height {
+                                NumberAnimation { duration: 80; easing.type: Easing.OutQuad }
                             }
                         }
                     }
