@@ -1,4 +1,4 @@
-// X-Seti - Oct 2025 - Global Player - Plasma 6.4 Compatible with Enhanced D-Bus
+// X-Seti - Jun 2026 - Global Player - Plasma 6.6 Compatible with Enhanced D-Bus
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
@@ -304,21 +304,33 @@ PlasmoidItem {
             playState = "Playing"
         } else {
             if (stationsModel.length === 0) {
-                errorMessage = "No stations available"
+                // Auto-refresh then play once stations arrive
+                refreshStations()
+                Qt.callLater(function() {
+                    if (stationsModel.length > 0) {
+                        _doPlay()
+                    } else {
+                        errorMessage = "No stations available"
+                    }
+                })
                 return
             }
-            if (stationIndex < 0 || stationIndex >= stationsModel.length) {
-                stationIndex = 0
-            }
-            selectedStation = stationsModel[stationIndex]
-            console.log("Playing station:", selectedStation)
-            qdbusCall("Play", [selectedStation])
-            if (!pollTimer.running) {
-                pollTimer.start()
-            }
-            getState()
-            getNowPlaying()
+            _doPlay()
         }
+    }
+
+    function _doPlay() {
+        if (stationIndex < 0 || stationIndex >= stationsModel.length) {
+            stationIndex = 0
+        }
+        selectedStation = stationsModel[stationIndex]
+        console.log("Playing station:", selectedStation)
+        qdbusCall("Play", [selectedStation])
+        if (!pollTimer.running) {
+            pollTimer.start()
+        }
+        getState()
+        getNowPlaying()
     }
 
     function stopPlayback() {
@@ -400,17 +412,20 @@ PlasmoidItem {
         // Connection will be attempted by startupTimer
     }
     
-    // Auto-refresh and play last station when expanded (from system tray)
-    onExpandedChanged: {
-        if (expanded && daemonConnected && selectedStation) {
-            // Refresh stations and play the currently selected station
+    // Auto-refresh on expand
+    Timer {
+        id: expandTimer
+        interval: 300
+        repeat: false
+        onTriggered: {
             refreshStations()
-            // Small delay to ensure stations are loaded before playing
-            Qt.callLater(function() {
-                if (selectedStation && stationsModel.length > 0) {
-                    playCurrent()
-                }
-            }, 500)
+            getState()
+        }
+    }
+
+    onExpandedChanged: {
+        if (expanded && daemonConnected) {
+            expandTimer.restart()
         }
     }
 
@@ -857,36 +872,32 @@ PlasmoidItem {
                     visible: !mediaMode
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    clip: true
+                    model: playedSongsModel
+                    delegate: RowLayout {
+                        width: ListView.view ? ListView.view.width : 0
+                        spacing: PlasmaCore.Units.smallSpacing
 
-                    ListView {
-                        anchors.fill: parent
-                        clip: true
-                        model: playedSongsModel
-                        delegate: RowLayout {
-                            width: ListView.view ? ListView.view.width : 0
-                            spacing: PlasmaCore.Units.smallSpacing
+                        PC3.Label {
+                            text: model.time || ""
+                            opacity: 0.7
+                            font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                            Layout.preferredWidth: PlasmaCore.Units.gridUnit * 3
+                        }
 
-                            PC3.Label {
-                                text: model.time || ""
-                                opacity: 0.7
-                                font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
-                                Layout.preferredWidth: PlasmaCore.Units.gridUnit * 3
-                            }
+                        PC3.Label {
+                            text: (model.artist || "") + " - " + (model.song || "")
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                            font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                        }
 
-                            PC3.Label {
-                                text: (model.artist || "") + " - " + (model.song || "")
-                                Layout.fillWidth: true
-                                elide: Text.ElideRight
-                                font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
-                            }
-
-                            PC3.Label {
-                                text: model.station || ""
-                                color: PlasmaCore.Theme.positiveTextColor
-                                font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
-                                Layout.preferredWidth: PlasmaCore.Units.gridUnit * 5
-                                elide: Text.ElideRight
-                            }
+                        PC3.Label {
+                            text: model.station || ""
+                            color: PlasmaCore.Theme.positiveTextColor
+                            font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                            Layout.preferredWidth: PlasmaCore.Units.gridUnit * 5
+                            elide: Text.ElideRight
                         }
                     }
                 }
