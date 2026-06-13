@@ -529,266 +529,183 @@ PlasmoidItem {
     }
 
     // Full widget representation
-    fullRepresentation: ColumnLayout {
-        width: PlasmaCore.Units.gridUnit * 35
-        height: PlasmaCore.Units.gridUnit * 25
-        Layout.preferredWidth: PlasmaCore.Units.gridUnit * 35
-        Layout.preferredHeight: PlasmaCore.Units.gridUnit * 25
+    fullRepresentation: Item {
+        id: fullRep
+        implicitWidth:  PlasmaCore.Units.gridUnit * 35
+        implicitHeight: PlasmaCore.Units.gridUnit * 28
 
-        // Connection status banner
+        // -- Error banner --
         Rectangle {
+            id: errorBanner
             visible: !daemonConnected || errorMessage !== ""
-            Layout.fillWidth: true
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
             height: PlasmaCore.Units.gridUnit * 2
             color: PlasmaCore.Theme.negativeBackgroundColor
             radius: PlasmaCore.Units.smallSpacing
 
             RowLayout {
-                anchors.centerIn: parent
+                anchors.fill: parent
+                anchors.margins: PlasmaCore.Units.smallSpacing
                 spacing: PlasmaCore.Units.smallSpacing
-
                 PC3.Label {
-                    text: "⚠️"
-                    font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 1.2
-                }
-
-                PC3.Label {
-                    text: errorMessage !== "" ? errorMessage : "Daemon not connected - check service status"
+                    text: "!"
+                    font.bold: true
                     color: PlasmaCore.Theme.negativeTextColor
                 }
-
+                PC3.Label {
+                    Layout.fillWidth: true
+                    text: errorMessage !== "" ? errorMessage : "Daemon not connected"
+                    color: PlasmaCore.Theme.negativeTextColor
+                    elide: Text.ElideRight
+                }
                 PC3.Button {
                     text: "Retry"
                     visible: !daemonConnected
-                    onClicked: {
-                        console.log("Manual reconnection attempt")
-                        testDaemonConnection()
-                        refreshStations()
-                    }
-                }
-
-                PC3.Button {
-                    text: "Check Service"
-                    onClicked: {
-                        execDS.connectSource("konsole -e systemctl --user status gpd.service")
-                    }
+                    onClicked: { testDaemonConnection(); refreshStations() }
                 }
             }
         }
 
-        // Top section - Cover art and controls
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.preferredHeight: PlasmaCore.Units.gridUnit * 9
-            Layout.minimumHeight: PlasmaCore.Units.gridUnit * 9
-            spacing: PlasmaCore.Units.largeSpacing
+        // -- Artwork box --
+        Rectangle {
+            id: artworkBox
+            anchors.top: errorBanner.visible ? errorBanner.bottom : parent.top
+            anchors.topMargin: PlasmaCore.Units.smallSpacing
+            anchors.left: parent.left
+            anchors.leftMargin: PlasmaCore.Units.smallSpacing
+            width:  PlasmaCore.Units.gridUnit * 8
+            height: PlasmaCore.Units.gridUnit * 8
+            radius: PlasmaCore.Units.smallSpacing
+            color: PlasmaCore.Theme.backgroundColor
+            border.color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.highlightColor
+            border.width: 2
 
-            Rectangle {
-                id: artworkBox
-                width: PlasmaCore.Units.gridUnit * 8
-                height: PlasmaCore.Units.gridUnit * 8
-                Layout.preferredWidth: PlasmaCore.Units.gridUnit * 8
-                Layout.preferredHeight: PlasmaCore.Units.gridUnit * 8
-                Layout.minimumWidth: PlasmaCore.Units.gridUnit * 8
-                Layout.minimumHeight: PlasmaCore.Units.gridUnit * 8
-                Layout.maximumWidth: PlasmaCore.Units.gridUnit * 8
-                Layout.alignment: Qt.AlignVCenter | Qt.AlignLeft
-                radius: PlasmaCore.Units.smallSpacing
-                color: PlasmaCore.Theme.backgroundColor
-                border.color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.highlightColor
-                border.width: 2
+            Image {
+                anchors.fill: parent
+                anchors.margins: 4
+                source: artworkUrl
+                fillMode: Image.PreserveAspectFit
+                visible: artworkUrl !== ""
+            }
+            Kirigami.Icon {
+                anchors.centerIn: parent
+                source: "radio"
+                width: parent.width * 0.5
+                height: parent.height * 0.5
+                visible: artworkUrl === ""
+            }
+        }
 
-                Image {
-                    anchors.fill: parent
-                    anchors.margins: PlasmaCore.Units.smallSpacing
-                    source: artworkUrl
-                    fillMode: Image.PreserveAspectFit
-                    visible: artworkUrl !== ""
-                }
+        // -- Controls column (right of artwork) --
+        Column {
+            id: controlsCol
+            anchors.top: artworkBox.top
+            anchors.left: artworkBox.right
+            anchors.leftMargin: PlasmaCore.Units.largeSpacing
+            anchors.right: parent.right
+            anchors.rightMargin: PlasmaCore.Units.smallSpacing
+            spacing: PlasmaCore.Units.smallSpacing
 
-                Kirigami.Icon {
-                    anchors.centerIn: parent
-                    source: "radio"
-                    width: parent.width * 0.5
-                    height: parent.height * 0.5
-                    visible: artworkUrl === ""
-                }
+            PC3.ComboBox {
+                id: stationCombo
+                width: parent.width
+                model: stationsModel
+                currentIndex: stationIndex
+                onActivated: { stationIndex = index; playCurrent() }
             }
 
-            ColumnLayout {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
+            PC3.Label {
+                width: parent.width
+                text: selectedStation || "No Station Selected"
+                font.bold: true
+                horizontalAlignment: Text.AlignHCenter
+                elide: Text.ElideRight
+            }
+
+            PC3.Label {
+                width: parent.width
+                text: nowPlaying
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                maximumLineCount: 2
+                elide: Text.ElideRight
+            }
+
+            // Transport buttons
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter
                 spacing: PlasmaCore.Units.smallSpacing
 
-                // Station selection dropdown with cover art
-                PC3.ComboBox {
-                    id: stationCombo
-                    Layout.fillWidth: true
-                    model: stationsModel
-                    // plain string array - no textRole needed
-                    currentIndex: stationIndex
-                    onActivated: {
-                        stationIndex = index
-                        playCurrent()
-                    }
-                    // Custom delegate to show station with potential cover art
-                    delegate: ItemDelegate {
-                        width: ListView.view.width
-                        contentItem: RowLayout {
-                            spacing: PlasmaCore.Units.smallSpacing
-                            
-                            // Placeholder for potential station artwork (could be enhanced in future)
-                            Rectangle {
-                                Layout.preferredWidth: PlasmaCore.Units.iconSizes.small
-                                Layout.preferredHeight: PlasmaCore.Units.iconSizes.small
-                                color: PlasmaCore.Theme.backgroundColor
-                                border.color: PlasmaCore.Theme.textColor
-                                border.width: 1
-                                radius: 2
-                                
-                                Kirigami.Icon {
-                                    anchors.centerIn: parent
-                                    source: "radio"
-                                    width: parent.width * 0.6
-                                    height: parent.height * 0.6
-                                }
-                            }
-                            
-                            PC3.Label {
-                                text: modelData
-                                elide: Text.ElideRight
-                                Layout.fillWidth: true
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                        }
-                        highlighted: ListView.isCurrentItem
-                    }
-                    // Show loading state when stations are not available - handled by model
-                    visible: !mediaMode
+                PC3.Button {
+                    text: "⏮"
+                    onClicked: prevStation()
+                    enabled: daemonConnected && stationsModel.length > 1
                 }
-                
-                PC3.Label {
-                    text: selectedStation || (mediaMode ? "Media Player" : "No Station Selected")
-                    font.bold: true
-                    font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 1.3
-                    Layout.fillWidth: true
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.WordWrap
-                    visible: !mediaMode
+                PC3.Button {
+                    text: isPlaying ? "⏸" : "▶"
+                    onClicked: togglePlay()
+                    enabled: daemonConnected
+                    highlighted: isPlaying
                 }
-
-                PC3.Label {
-                    Layout.fillWidth: true
-                    text: nowPlaying
-                    font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 1.1
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.WordWrap
-                    maximumLineCount: 2
-                    elide: Text.ElideRight
+                PC3.Button {
+                    text: "⏹"
+                    onClicked: stopPlayback()
+                    enabled: daemonConnected && isPlaying
                 }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    Layout.alignment: Qt.AlignHCenter
-                    spacing: PlasmaCore.Units.smallSpacing
-
-                    PC3.Button {
-                        text: "⏮"
-                        onClicked: prevStation()
-                        enabled: daemonConnected && !mediaMode && stationsModel.length > 1
-                        PC3.ToolTip.text: "Previous Station"
-                        PC3.ToolTip.visible: hovered
-                    }
-
-                    PC3.Button {
-                        text: isPlaying ? "⏸" : "▶️"
-                        font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 1.2
-                        onClicked: togglePlay()
-                        enabled: daemonConnected
-                        highlighted: isPlaying
-                        PC3.ToolTip.text: isPlaying ? "Pause" : "Play"
-                        PC3.ToolTip.visible: hovered
-                    }
-
-                    PC3.Button {
-                        text: "⏹"
-                        onClicked: stopPlayback()
-                        enabled: daemonConnected && isPlaying
-                        PC3.ToolTip.text: "Stop"
-                        PC3.ToolTip.visible: hovered
-                    }
-
-                    PC3.Button {
-                        text: "⏭"
-                        onClicked: nextStation()
-                        enabled: daemonConnected && !mediaMode && stationsModel.length > 1
-                        PC3.ToolTip.text: "Next Station"
-                        PC3.ToolTip.visible: hovered
-                    }
-                    
-                    // Volume control with icon
-                    RowLayout {
-                        spacing: PlasmaCore.Units.smallSpacing
-                        
-                        Kirigami.Icon {
-                            source: "player-volume"
-                            width: PlasmaCore.Units.iconSizes.smallMedium
-                            height: PlasmaCore.Units.iconSizes.smallMedium
-                            color: PlasmaCore.Theme.textColor
-                        }
-                        
-                        PC3.Slider {
-                            id: volumeSlider
-                            from: 0
-                            to: 100
-                            value: 80  // Default volume will be updated from daemon state
-                            stepSize: 5
-                            implicitWidth: 100
-                            onValueChanged: {
-                                // Send volume change to daemon
-                                qdbusCall("SetVolume", [value])
-                                // Refresh state to get updated volume
-                                if (daemonConnected) {
-                                    getState()
-                                }
-                            }
-                            PC3.ToolTip.text: "Volume: " + volumeSlider.value + "%"
-                            PC3.ToolTip.visible: hovered
-                        }
-                    }
+                PC3.Button {
+                    text: "⏭"
+                    onClicked: nextStation()
+                    enabled: daemonConnected && stationsModel.length > 1
                 }
-
-                PC3.Label {
-                    visible: stationsModel.length > 0
-                    text: "Station " + (stationIndex + 1) + " of " + stationsModel.length
-                    font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
-                    opacity: 0.7
-                    Layout.fillWidth: true
-                    horizontalAlignment: Text.AlignHCenter
+                Kirigami.Icon {
+                    source: "player-volume"
+                    width: PlasmaCore.Units.iconSizes.small
+                    height: PlasmaCore.Units.iconSizes.small
+                    anchors.verticalCenter: parent.verticalCenter
                 }
+                PC3.Slider {
+                    id: volumeSlider
+                    from: 0; to: 100; value: 80; stepSize: 5
+                    width: PlasmaCore.Units.gridUnit * 7
+                    anchors.verticalCenter: parent.verticalCenter
+                    onValueChanged: if (daemonConnected) qdbusCall("SetVolume", [value])
+                }
+            }
+
+            PC3.Label {
+                width: parent.width
+                visible: stationsModel.length > 0
+                text: "Station " + (stationIndex + 1) + " of " + stationsModel.length
+                font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                opacity: 0.7
+                horizontalAlignment: Text.AlignHCenter
             }
         }
 
-        // VU meter - full width row, direct child of fullRepresentation
+        // -- VU meter (full width, below artwork/controls) --
         Item {
             id: vuMeter
-            Layout.fillWidth: true
-            Layout.preferredHeight: PlasmaCore.Units.gridUnit * 2
-            Layout.minimumHeight: PlasmaCore.Units.gridUnit * 2
+            anchors.top: artworkBox.bottom
+            anchors.topMargin: PlasmaCore.Units.smallSpacing
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.leftMargin: PlasmaCore.Units.smallSpacing
+            anchors.rightMargin: PlasmaCore.Units.smallSpacing
+            height: PlasmaCore.Units.gridUnit * 2
 
             property var barHeights: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
             property int barCount: 16
 
             Timer {
-                interval: 100
-                running: isPlaying
-                repeat: true
+                interval: 100; running: isPlaying; repeat: true
                 onTriggered: {
                     var h = []
                     for (var i = 0; i < vuMeter.barCount; i++) {
                         var prev = vuMeter.barHeights[i]
-                        var target = 0.1 + Math.random() * 0.9
-                        h.push(target > prev ? target : prev * 0.65)
+                        var t = 0.1 + Math.random() * 0.9
+                        h.push(t > prev ? t : prev * 0.65)
                     }
                     vuMeter.barHeights = h
                 }
@@ -829,9 +746,15 @@ PlasmoidItem {
             }
         }
 
-        // Options row
-        RowLayout {
-            Layout.fillWidth: true
+        // -- Options row --
+        Row {
+            id: optionsRow
+            anchors.top: vuMeter.bottom
+            anchors.topMargin: PlasmaCore.Units.smallSpacing
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.leftMargin: PlasmaCore.Units.smallSpacing
+            anchors.rightMargin: PlasmaCore.Units.smallSpacing
             spacing: PlasmaCore.Units.smallSpacing
 
             PC3.CheckBox {
@@ -840,153 +763,92 @@ PlasmoidItem {
                 enabled: daemonConnected
                 onToggled: qdbusCall("SetLogging", [checked ? "true" : "false"])
             }
-
             PC3.CheckBox {
                 text: "Notifications"
                 checked: pushNotifications
                 enabled: daemonConnected
                 onToggled: qdbusCall("SetNotifications", [checked ? "true" : "false"])
             }
-            
-            // Play delay setting
-            RowLayout {
-                spacing: PlasmaCore.Units.smallSpacing
-                
-                Kirigami.Icon {
-                    source: "chronometer"
-                    width: PlasmaCore.Units.iconSizes.small
-                    height: PlasmaCore.Units.iconSizes.small
-                    color: PlasmaCore.Theme.textColor
-                }
-                
-                PC3.Slider {
-                    id: delaySlider
-                    from: 0
-                    to: 420
-                    value: 0  // Default delay
-                    stepSize: 10
-                    implicitWidth: 120
-                    onValueChanged: {
-                        // Send delay change to daemon
-                        qdbusCall("SetPlayDelay", [value])
-                        // Refresh state to get updated delay
-                        if (daemonConnected) {
-                            getState()
-                        }
-                    }
-                    PC3.ToolTip.text: "Play Delay: " + delaySlider.value + "ms"
-                    PC3.ToolTip.visible: hovered
-                }
-                
-                PC3.Label {
-                    text: delaySlider.value + "ms"
-                    font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
-                }
-            }
-            
-            // Favorite button for current station
+            Item { width: parent.width - 400; height: 1 }
             PC3.Button {
-                icon.name: "star"
-                text: "Favorite"
-                checkable: true
-                checked: false  // Will be updated based on favorites list
-                enabled: daemonConnected && selectedStation !== ""
-                onClicked: {
-                    // Toggle favorite status for current station
-                    console.log("Toggling favorite for:", selectedStation)
-                }
-                PC3.ToolTip.text: "Mark as favorite"
-                PC3.ToolTip.visible: hovered
+                text: "Refresh"
+                enabled: daemonConnected
+                onClicked: { refreshStations(); getState() }
             }
-
-            Item { Layout.fillWidth: true }
-
-            PC3.Button {
-                text: "↻ Refresh"
-                onClicked: {
-                    refreshStations()
-                    getState()
-                }
-                enabled: daemonConnected && !mediaMode
-                PC3.ToolTip.text: "Reload station list"
-                PC3.ToolTip.visible: hovered
-            }
-
             PC3.Button {
                 text: "Sign In"
+                enabled: daemonConnected
                 onClicked: signIn()
-                enabled: daemonConnected && !mediaMode
-                visible: !mediaMode
             }
         }
 
-        // Song history
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            color: "transparent"
+        // -- Recently Played header --
+        Row {
+            id: historyHeader
+            anchors.top: optionsRow.bottom
+            anchors.topMargin: PlasmaCore.Units.smallSpacing
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.leftMargin: PlasmaCore.Units.smallSpacing
+            anchors.rightMargin: PlasmaCore.Units.smallSpacing
 
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: PlasmaCore.Units.smallSpacing
-                spacing: PlasmaCore.Units.smallSpacing
+            PC3.Label {
+                text: "Recently Played"
+                font.bold: true
+                width: parent.width * 0.6
+            }
+            PC3.Label {
+                text: "Global Player v3.3"
+                font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                opacity: 0.6
+                anchors.right: parent.right
+            }
+        }
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    PC3.Label {
-                        text: mediaMode ? "Media Player" : "Recently Played"
-                        font.bold: true
-                        Layout.fillWidth: true
-                    }
-                    PC3.Label {
-                        text: "Global Player v3.3"
-                        font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
-                        opacity: 0.6
-                    }
-                }
-
-                ListView {
-                    visible: !mediaMode
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    clip: true
-                    model: playedSongsModel
-                    delegate: RowLayout {
-                        width: ListView.view ? ListView.view.width : 0
-                        spacing: PlasmaCore.Units.smallSpacing
-
-                        PC3.Label {
-                            text: model.time || ""
-                            opacity: 0.7
-                            font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
-                            Layout.preferredWidth: PlasmaCore.Units.gridUnit * 3
-                        }
-
-                        PC3.Label {
-                            text: (model.artist || "") + " - " + (model.song || "")
-                            Layout.fillWidth: true
-                            elide: Text.ElideRight
-                            font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
-                        }
-
-                        PC3.Label {
-                            text: model.station || ""
-                            color: PlasmaCore.Theme.positiveTextColor
-                            font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
-                            Layout.preferredWidth: PlasmaCore.Units.gridUnit * 5
-                            elide: Text.ElideRight
-                        }
-                    }
-                }
+        // -- Song history list --
+        ListView {
+            anchors.top: historyHeader.bottom
+            anchors.topMargin: PlasmaCore.Units.smallSpacing
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: PlasmaCore.Units.smallSpacing
+            anchors.rightMargin: PlasmaCore.Units.smallSpacing
+            clip: true
+            model: playedSongsModel
+            delegate: Item {
+                width: ListView.view ? ListView.view.width : 0
+                height: PlasmaCore.Units.gridUnit * 2
 
                 PC3.Label {
-                    visible: mediaMode
-                    text: "Media mode - not yet implemented"
-                    horizontalAlignment: Text.AlignHCenter
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    verticalAlignment: Text.AlignVCenter
-                    opacity: 0.5
+                    id: timeLabel
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: model.time || ""
+                    opacity: 0.6
+                    font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                    width: PlasmaCore.Units.gridUnit * 4
+                }
+                PC3.Label {
+                    id: stationLabel
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: model.station || ""
+                    color: PlasmaCore.Theme.positiveTextColor
+                    font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                    width: PlasmaCore.Units.gridUnit * 6
+                    elide: Text.ElideRight
+                    horizontalAlignment: Text.AlignRight
+                }
+                PC3.Label {
+                    anchors.left: timeLabel.right
+                    anchors.right: stationLabel.left
+                    anchors.leftMargin: PlasmaCore.Units.smallSpacing
+                    anchors.rightMargin: PlasmaCore.Units.smallSpacing
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: (model.artist || "") + " - " + (model.song || "")
+                    elide: Text.ElideRight
+                    font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
                 }
             }
         }
