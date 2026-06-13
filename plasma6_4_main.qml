@@ -453,14 +453,14 @@ PlasmoidItem {
                 visible: artworkUrl !== ""
             }
 
-            PC3.Label {
+            Kirigami.Icon {
                 anchors.centerIn: parent
-                text: {
-                    if (!daemonConnected) return "?"
-                    return mediaMode ? "♫" : "♪"
+                source: {
+                    if (!daemonConnected) return "network-disconnect"
+                    return mediaMode ? "media-playback-start" : "radio"
                 }
-                font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 0.8
-                color: PlasmaCore.Theme.textColor
+                width: parent.width * 0.6
+                height: parent.height * 0.6
                 visible: artworkUrl === ""
             }
 
@@ -545,9 +545,10 @@ PlasmoidItem {
                 anchors.centerIn: parent
                 spacing: PlasmaCore.Units.smallSpacing
 
-                PC3.Label {
-                    text: "⚠️"
-                    font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 1.2
+                Kirigami.Icon {
+                    source: "dialog-warning"
+                    width: PlasmaCore.Units.iconSizes.small
+                    height: PlasmaCore.Units.iconSizes.small
                 }
 
                 PC3.Label {
@@ -577,14 +578,18 @@ PlasmoidItem {
         // Top section - Cover art and controls
         RowLayout {
             Layout.fillWidth: true
+            Layout.preferredHeight: PlasmaCore.Units.gridUnit * 8
+            Layout.minimumHeight: PlasmaCore.Units.gridUnit * 8
             spacing: PlasmaCore.Units.largeSpacing
 
             Rectangle {
+                width: PlasmaCore.Units.gridUnit * 8
+                height: PlasmaCore.Units.gridUnit * 8
                 Layout.preferredWidth: PlasmaCore.Units.gridUnit * 8
                 Layout.preferredHeight: PlasmaCore.Units.gridUnit * 8
                 Layout.minimumWidth: PlasmaCore.Units.gridUnit * 8
                 Layout.minimumHeight: PlasmaCore.Units.gridUnit * 8
-                Layout.alignment: Qt.AlignTop
+                Layout.alignment: Qt.AlignVCenter
                 radius: PlasmaCore.Units.smallSpacing
                 color: "transparent"
                 border.color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.textColor
@@ -598,11 +603,11 @@ PlasmoidItem {
                     visible: artworkUrl !== ""
                 }
 
-                PC3.Label {
+                Kirigami.Icon {
                     anchors.centerIn: parent
-                    text: mediaMode ? "♫" : "♪"
-                    font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 3
-                    color: PlasmaCore.Theme.textColor
+                    source: mediaMode ? "media-playback-start" : "radio"
+                    width: parent.width * 0.5
+                    height: parent.height * 0.5
                     visible: artworkUrl === ""
                 }
             }
@@ -683,7 +688,7 @@ PlasmoidItem {
                     spacing: PlasmaCore.Units.smallSpacing
 
                     PC3.Button {
-                        text: "⏮"
+                        icon.name: "media-skip-backward"
                         onClicked: prevStation()
                         enabled: daemonConnected && !mediaMode && stationsModel.length > 1
                         PC3.ToolTip.text: "Previous Station"
@@ -691,8 +696,7 @@ PlasmoidItem {
                     }
 
                     PC3.Button {
-                        text: isPlaying ? "⏸" : "▶️"
-                        font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 1.2
+                        icon.name: isPlaying ? "media-playback-pause" : "media-playback-start"
                         onClicked: togglePlay()
                         enabled: daemonConnected
                         highlighted: isPlaying
@@ -701,7 +705,7 @@ PlasmoidItem {
                     }
 
                     PC3.Button {
-                        text: "⏹"
+                        icon.name: "media-playback-stop"
                         onClicked: stopPlayback()
                         enabled: daemonConnected && isPlaying
                         PC3.ToolTip.text: "Stop"
@@ -709,7 +713,7 @@ PlasmoidItem {
                     }
 
                     PC3.Button {
-                        text: "⏭"
+                        icon.name: "media-skip-forward"
                         onClicked: nextStation()
                         enabled: daemonConnected && !mediaMode && stationsModel.length > 1
                         PC3.ToolTip.text: "Next Station"
@@ -832,7 +836,8 @@ PlasmoidItem {
             Item { Layout.fillWidth: true }
 
             PC3.Button {
-                text: "↻ Refresh"
+                icon.name: "view-refresh"
+                text: "Refresh"
                 onClicked: {
                     refreshStations()
                     getState()
@@ -874,7 +879,7 @@ PlasmoidItem {
                     model: playedSongsModel
                     delegate: Item {
                         width: ListView.view ? ListView.view.width : 0
-                        height: PlasmaCore.Units.gridUnit * 1.4
+                        height: PlasmaCore.Units.gridUnit * 2
 
                         PC3.Label {
                             id: timeLabel
