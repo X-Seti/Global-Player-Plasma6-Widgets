@@ -11,7 +11,6 @@ import org.kde.kirigami 2.20 as Kirigami
 PlasmoidItem {
     id: root
 
-    // D-Bus integrated state
     property var stationsModel: []
     property int stationIndex: 0
     property string selectedStation: {
@@ -28,672 +27,355 @@ PlasmoidItem {
     property url artworkUrl: ""
     property bool daemonConnected: false
     property string errorMessage: ""
-
-    // UI state
     property bool mediaMode: false
     property bool isPlaying: playState === "Playing"
-    
-    // Computed properties for display
-    property string displayTitle: {
-        if (nowArtist && nowTitle) {
-            return nowArtist + " — " + nowTitle
-        } else if (nowTitle) {
-            return nowTitle
-        } else if (selectedStation) {
-            return selectedStation
-        } else if (!daemonConnected) {
-            return "Connecting..."
-        } else if (stationsModel.length === 0) {
-            return "No Stations"
-        } else {
-            return "Global Player"
-        }
-    }
+    property var playedSongs: []
 
     property string nowPlaying: {
-        if (nowArtist && nowTitle) {
-            return nowArtist + " - " + nowTitle
-        } else if (nowTitle) {
-            return nowTitle
-        } else if (!daemonConnected) {
-            return "Waiting for daemon..."
-        } else if (stationsModel.length === 0) {
-            return "No stations loaded"
-        } else {
-            return "Select a station"
-        }
+        if (nowArtist && nowTitle) return nowArtist + " - " + nowTitle
+        if (nowTitle) return nowTitle
+        if (!daemonConnected) return "Waiting for daemon..."
+        if (stationsModel.length === 0) return "No stations loaded"
+        return "Select a station"
     }
 
-    // Song history
-    property var playedSongs: []
-    
-    // Tooltip for panel mode
-    toolTipSubText: {
-        if (!daemonConnected) {
-            return "Daemon not connected"
-        } else if (playState === "Playing" && selectedStation) {
-            return "Playing: " + selectedStation
-        } else {
-            return playState
-        }
+    property string displayTitle: {
+        if (nowArtist && nowTitle) return nowArtist + " - " + nowTitle
+        if (selectedStation) return selectedStation
+        return "Global Player"
     }
 
-    // Song history model
-    ListModel {
-        id: playedSongsModel
-    }
+    toolTipSubText: daemonConnected ? (isPlaying ? "Playing: " + selectedStation : playState) : "Daemon not connected"
 
-    // Startup connection timer - try multiple times
+    ListModel { id: playedSongsModel }
+
     Timer {
         id: startupTimer
-        interval: 1000
-        running: true
-        repeat: true
+        interval: 1000; running: true; repeat: true
         property int attempts: 0
-        
         onTriggered: {
             attempts++
-            console.log("Connection attempt", attempts, "/10")
-            
             if (!daemonConnected) {
                 testDaemonConnection()
-                
-                if (attempts >= 10) {
-                    console.log("Failed to connect to daemon after 10 attempts")
-                    errorMessage = "Cannot connect to daemon. Is it running?"
-                    running = false
-                }
-            } else {
-                console.log("Daemon connected successfully")
-                running = false
-            }
+                if (attempts >= 10) { errorMessage = "Cannot connect to daemon."; running = false }
+            } else { running = false }
         }
     }
 
-    // Poll metadata timer
     Timer {
         id: pollTimer
         interval: 10000
         running: daemonConnected && !mediaMode
         repeat: true
-        onTriggered: {
-            if (daemonConnected) {
-                getNowPlaying()
-            }
-        }
+        onTriggered: { if (daemonConnected) getNowPlaying() }
     }
 
-    // D-Bus Data Source
+    Timer {
+        id: expandTimer
+        interval: 300; repeat: false
+        onTriggered: { refreshStations(); getState() }
+    }
+
     Plasma5Support.DataSource {
         id: execDS
         engine: "executable"
-
         onNewData: function(sourceName, data) {
             var out = (data["stdout"] || "").trim()
             var err = (data["stderr"] || "").trim()
-
-            if (err) {
-                console.log("Command error:", err)
-                if (err.indexOf("not find") !== -1 || err.indexOf("not available") !== -1) {
-                    daemonConnected = false
-                }
-            }
-
-            if (sourceName.indexOf("TestConnection") !== -1) {
-                if (out || err.indexOf("method") === -1) {
-                    daemonConnected = true
-                    console.log("Daemon connection verified")
-                    // Immediately fetch initial data
-                    refreshStations()
-                    getState()
-                } else {
-                    daemonConnected = false
-                }
-            } else if (sourceName.indexOf("GetNowPlaying") !== -1) {
+            if (err && (err.indexOf("not find") !== -1 || err.indexOf("not available") !== -1))
+                daemonConnected = false
+            if (sourceName.indexOf("GetNowPlaying") !== -1) {
                 try {
                     var m = JSON.parse(out)
-                    nowArtist = m.artist || ""
-                    nowTitle = m.title || ""
-                    nowShow = m.show || ""
-                    playState = m.state || playState
-                    if (m.artworkPath) {
-                        artworkUrl = "file://" + m.artworkPath
-                    } else {
-                        artworkUrl = ""
-                    }
-
-                    // Add to history when in radio mode
-                    if (!mediaMode && (nowArtist || nowTitle)) {
-                        addToHistory(nowTitle, nowArtist)
-                    }
-
-                } catch (e) {
-                    console.log("Error parsing GetNowPlaying:", e)
-                }
+                    nowArtist = m.artist || ""; nowTitle = m.title || ""
+                    nowShow = m.show || ""; playState = m.state || playState
+                    artworkUrl = m.artworkPath ? ("file://" + m.artworkPath) : ""
+                    if (!mediaMode && (nowArtist || nowTitle)) addToHistory(nowTitle, nowArtist)
+                } catch(e) {}
             } else if (sourceName.indexOf("GetState") !== -1) {
                 try {
                     var s = JSON.parse(out)
                     playState = s.state || playState
                     loggingEnabled = s.logging === true
                     pushNotifications = s.notifications === true
+                    daemonConnected = true; errorMessage = ""
                     var st = s.station || ""
-                    if (st.length > 0 && stationsModel.indexOf(st) >= 0) {
-                        stationIndex = stationsModel.indexOf(st)
-                    }
-                    daemonConnected = true
-                    
-                    // Initialize volume slider with saved volume
-                    if (s.volume !== undefined) {
-                        volumeSlider.value = s.volume
-                    }
-                    
-                    // Initialize delay slider with saved delay
-                    if (s.playDelay !== undefined) {
-                        delaySlider.value = s.playDelay
-                    }
-                } catch (e) {
-                    console.log("Error parsing GetState:", e)
-                }
+                    var idx = stationsModel.indexOf(st)
+                    if (idx >= 0) { stationIndex = idx; stationCombo.currentIndex = idx }
+                    if (s.volume !== undefined) volumeSlider.value = s.volume
+                    if (stationsModel.length === 0) refreshStations()
+                } catch(e) {}
             } else if (sourceName.indexOf("GetStations") !== -1) {
                 try {
                     var arr = JSON.parse(out)
                     if (arr && arr.length > 0) {
-                        stationsModel = arr
-                        console.log("Loaded", arr.length, "stations")
-                        if (arr.length > 0 && stationIndex >= arr.length) {
-                            stationIndex = 0
-                        }
-                        daemonConnected = true
-                        errorMessage = ""
-                    } else {
-                        console.log("No stations returned from daemon")
-                        errorMessage = "No stations available. Check daemon logs."
-                    }
-                } catch (e) {
-                    console.log("Error parsing GetStations:", e)
-                    errorMessage = "Failed to parse station list"
-                }
+                        stationsModel = arr; daemonConnected = true; errorMessage = ""
+                        if (stationIndex >= arr.length) stationIndex = 0
+                        stationCombo.currentIndex = stationIndex
+                    } else { errorMessage = "No stations available." }
+                } catch(e) { errorMessage = "Failed to parse station list" }
             }
             disconnectSource(sourceName)
         }
     }
 
-    // D-Bus helper functions
     function qdbusCall(method, args) {
-        // Use Python D-Bus instead of qdbus command
-        var pythonCmd = "/usr/bin/python3 -c \""
-        pythonCmd += "import dbus, json, sys; "
-        pythonCmd += "bus = dbus.SessionBus(); "
-        pythonCmd += "obj = bus.get_object('org.mooheda.gpd', '/org/mooheda/gpd'); "
-        pythonCmd += "iface = dbus.Interface(obj, 'org.mooheda.gpd1'); "
-
+        var cmd = "/usr/bin/python3 -c \""
+        cmd += "import dbus; bus = dbus.SessionBus(); "
+        cmd += "obj = bus.get_object('org.mooheda.gpd', '/org/mooheda/gpd'); "
+        cmd += "iface = dbus.Interface(obj, 'org.mooheda.gpd1'); "
         if (args && args.length > 0) {
-            // Method with arguments
-            var escapedArgs = []
-            for (var i = 0; i < args.length; ++i) {
-                var a = ("" + args[i]).replace(/'/g, "\\'")
-                escapedArgs.push("'" + a + "'")
-            }
-            pythonCmd += "result = iface." + method + "(" + escapedArgs.join(", ") + "); "
+            var esc = []
+            for (var i = 0; i < args.length; i++)
+                esc.push("'" + ("" + args[i]).replace(/'/g, "\\'") + "'")
+            cmd += "print(str(iface." + method + "(" + esc.join(",") + ")))"
         } else {
-            // Method without arguments
-            pythonCmd += "result = iface." + method + "(); "
+            cmd += "print(str(iface." + method + "()))"
         }
-
-        pythonCmd += "print(str(result))"
-        pythonCmd += "\""
-
-        console.log("D-Bus call:", method)
-        execDS.connectSource(pythonCmd)
+        cmd += "\""
+        execDS.connectSource(cmd)
     }
 
-    function testDaemonConnection() {
-        // Try to call a simple method to test connection
-        qdbusCall("GetState", [])
-    }
+    function testDaemonConnection() { qdbusCall("GetState", []) }
+    function getNowPlaying() { if (daemonConnected && !mediaMode) qdbusCall("GetNowPlaying", []) }
+    function getState() { if (daemonConnected) qdbusCall("GetState", []) }
+    function refreshStations() { if (!mediaMode) qdbusCall("GetStations", []) }
+    function signIn() { qdbusCall("SignIn", []) }
 
-    function getNowPlaying() {
-        if (!mediaMode && daemonConnected) {
-            qdbusCall("GetNowPlaying", [])
-        }
-    }
-
-    function getState() {
-        if (daemonConnected) {
-            qdbusCall("GetState", [])
-        }
-    }
-
-    function refreshStations() {
-        if (!mediaMode) {
-            qdbusCall("GetStations", [])
-        }
-    }
-
-    function signIn() {
-        if (!mediaMode) {
-            qdbusCall("SignIn", [])
-        }
-    }
-
-    // Control functions
     function togglePlay() {
-        if (!daemonConnected) {
-            errorMessage = "Daemon not connected"
-            return
-        }
-        
-        if (mediaMode) {
-            isPlaying = !isPlaying
-        } else {
-            if (isPlaying) {
-                qdbusCall("Pause", [])
-            } else {
-                playCurrent()
-            }
-        }
+        if (!daemonConnected) return
+        if (isPlaying) qdbusCall("Pause", [])
+        else playCurrent()
     }
 
     function playCurrent() {
-        if (!daemonConnected) {
-            errorMessage = "Daemon not connected"
+        if (!daemonConnected) return
+        if (stationsModel.length === 0) {
+            refreshStations()
+            Qt.callLater(function() {
+                if (stationsModel.length > 0) _doPlay()
+                else errorMessage = "No stations available"
+            })
             return
         }
-        
-        if (mediaMode) {
-            playState = "Playing"
-        } else {
-            if (stationsModel.length === 0) {
-                // Auto-refresh then play once stations arrive
-                refreshStations()
-                Qt.callLater(function() {
-                    if (stationsModel.length > 0) {
-                        _doPlay()
-                    } else {
-                        errorMessage = "No stations available"
-                    }
-                })
-                return
-            }
-            _doPlay()
-        }
+        _doPlay()
     }
 
     function _doPlay() {
-        if (stationIndex < 0 || stationIndex >= stationsModel.length) {
-            stationIndex = 0
-        }
+        if (stationIndex < 0 || stationIndex >= stationsModel.length) stationIndex = 0
         selectedStation = stationsModel[stationIndex]
-        console.log("Playing station:", selectedStation)
+        stationCombo.currentIndex = stationIndex
         qdbusCall("Play", [selectedStation])
-        if (!pollTimer.running) {
-            pollTimer.start()
-        }
-        getState()
-        getNowPlaying()
+        getState(); getNowPlaying()
     }
 
-    function stopPlayback() {
-        if (!daemonConnected) {
-            return
-        }
-        
-        if (mediaMode) {
-            playState = "Stopped"
-        } else {
-            qdbusCall("Pause", [])
-        }
-    }
+    function stopPlayback() { if (daemonConnected) qdbusCall("Pause", []) }
 
     function nextStation() {
-        if (mediaMode) {
-            return
-        } else {
-            if (stationsModel.length === 0) return
-            stationIndex = (stationIndex + 1) % stationsModel.length
-            playCurrent()
-        }
+        if (stationsModel.length === 0) return
+        stationIndex = (stationIndex + 1) % stationsModel.length
+        playCurrent()
     }
 
     function prevStation() {
-        if (mediaMode) {
-            return
-        } else {
-            if (stationsModel.length === 0) return
-            stationIndex = (stationIndex - 1 + stationsModel.length) % stationsModel.length
-            playCurrent()
-        }
+        if (stationsModel.length === 0) return
+        stationIndex = (stationIndex - 1 + stationsModel.length) % stationsModel.length
+        playCurrent()
     }
 
-    function switchMode() {
-        mediaMode = !mediaMode
-        console.log("Switched to", mediaMode ? "Media Player" : "Radio", "mode")
-        
-        if (mediaMode) {
-            if (playState === "Playing") {
-                qdbusCall("Pause", [])
-            }
-        } else {
-            refreshStations()
-            getState()
-        }
-    }
-
-    // History management
     function addToHistory(song, artist) {
-        var newSong = {
-            "time": new Date().toLocaleTimeString(),
-            "song": song || "Unknown Song",
-            "artist": artist || "Unknown Artist", 
-            "station": mediaMode ? "Local Media" : selectedStation
+        var entry = {
+            "time": new Date().toLocaleTimeString(Qt.locale(), "HH:mm"),
+            "song": song || "Unknown", "artist": artist || "Unknown",
+            "station": selectedStation || ""
         }
-        
         if (playedSongs.length > 0) {
             var last = playedSongs[0]
-            if (last.song === newSong.song && last.artist === newSong.artist) {
-                return
-            }
+            if (last.song === entry.song && last.artist === entry.artist) return
         }
-        
-        playedSongs.unshift(newSong)
-        if (playedSongs.length > 10) {
-            playedSongs.pop()
-        }
+        var arr = [entry].concat(playedSongs)
+        if (arr.length > 20) arr.length = 20
+        playedSongs = arr
         playedSongsModel.clear()
-        for (var i = 0; i < playedSongs.length; i++) {
-            playedSongsModel.append(playedSongs[i])
-        }
+        for (var i = 0; i < arr.length; i++) playedSongsModel.append(arr[i])
     }
 
-    // Component initialization
     Component.onCompleted: {
-        console.log("Global Player Plasma 6.4 initializing...")
-        addToHistory("Starting Global Player", "System")
-        // Connection will be attempted by startupTimer
-    }
-    
-    // Auto-refresh on expand
-    Timer {
-        id: expandTimer
-        interval: 300
-        repeat: false
-        onTriggered: {
-            refreshStations()
-            getState()
-        }
+        Qt.callLater(function() { addToHistory("Global Player ready", "System") })
     }
 
-    onExpandedChanged: {
-        if (expanded && daemonConnected) {
-            expandTimer.restart()
-        }
-    }
+    onExpandedChanged: { if (expanded && daemonConnected) expandTimer.restart() }
 
-    // Compact panel representation
+    // Compact panel icon
     compactRepresentation: Item {
         Layout.preferredWidth: PlasmaCore.Units.iconSizes.small
         Layout.preferredHeight: PlasmaCore.Units.iconSizes.small
 
         Rectangle {
-            anchors.fill: parent
-            anchors.margins: 1
-            radius: 3
-            color: PlasmaCore.Theme.backgroundColor
-            border.color: {
-                if (!daemonConnected) return PlasmaCore.Theme.negativeTextColor
-                return isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.textColor
-            }
+            anchors.fill: parent; anchors.margins: 1
+            radius: 3; color: "transparent"
             border.width: 2
+            border.color: !daemonConnected ? PlasmaCore.Theme.negativeTextColor
+                        : isPlaying ? PlasmaCore.Theme.positiveTextColor
+                        : PlasmaCore.Theme.textColor
 
             Image {
-                anchors.fill: parent
-                anchors.margins: 3
+                anchors.fill: parent; anchors.margins: 3
                 fillMode: Image.PreserveAspectFit
-                source: artworkUrl
-                visible: artworkUrl !== ""
+                source: artworkUrl; visible: artworkUrl !== ""
             }
-
-            PC3.Label {
-                anchors.centerIn: parent
-                text: {
-                    if (!daemonConnected) return "?"
-                    return mediaMode ? "♫" : "♪"
-                }
-                font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 0.8
-                color: PlasmaCore.Theme.textColor
+            Kirigami.Icon {
+                anchors.centerIn: parent; source: "radio"
+                width: parent.width * 0.6; height: parent.height * 0.6
                 visible: artworkUrl === ""
             }
-
-            // Status indicator
             Rectangle {
-                anchors.bottom: parent.bottom
-                anchors.right: parent.right
-                anchors.margins: 1
-                width: 6
-                height: 6
-                radius: 3
-                color: {
-                    if (!daemonConnected) return PlasmaCore.Theme.negativeTextColor
-                    return isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.neutralTextColor
-                }
-                opacity: 0.9
+                anchors.bottom: parent.bottom; anchors.right: parent.right
+                anchors.margins: 1; width: 6; height: 6; radius: 3
+                color: !daemonConnected ? PlasmaCore.Theme.negativeTextColor
+                     : isPlaying ? PlasmaCore.Theme.positiveTextColor
+                     : PlasmaCore.Theme.neutralTextColor
             }
         }
 
         MouseArea {
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
-            
             onClicked: function(mouse) {
-                if (mouse.button === Qt.LeftButton) {
-                    togglePlay()
-                } else if (mouse.button === Qt.RightButton) {
-                    nextStation()
-                } else if (mouse.button === Qt.MiddleButton) {
-                    root.expanded = !root.expanded
-                }
+                if (mouse.button === Qt.LeftButton) togglePlay()
+                else if (mouse.button === Qt.RightButton) nextStation()
+                else root.expanded = !root.expanded
             }
-            
-            onPressAndHold: {
-                root.expanded = !root.expanded
-            }
-            
+            onPressAndHold: { root.expanded = !root.expanded }
             onWheel: function(wheel) {
-                if (wheel.angleDelta.y > 0) {
-                    prevStation()
-                } else {
-                    nextStation()
-                }
+                if (wheel.angleDelta.y > 0) prevStation(); else nextStation()
                 wheel.accepted = true
             }
-
             PC3.ToolTip {
-                text: {
-                    var tooltip = displayTitle
-                    if (errorMessage !== "") {
-                        tooltip += "\n⚠️ " + errorMessage
-                    }
-                    if (nowShow && nowShow !== "") {
-                        tooltip += "\nShow: " + nowShow
-                    }
-                    tooltip += "\nStatus: " + (daemonConnected ? playState : "Disconnected")
-                    if (daemonConnected && stationsModel.length > 0) {
-                        tooltip += "\nStations: " + stationsModel.length
-                    }
-                    return tooltip
-                }
+                text: displayTitle + "\n" + (daemonConnected ? playState : "Disconnected")
                 visible: parent.containsMouse && !root.expanded
                 delay: 500
             }
         }
     }
 
-    // Full widget representation
+    // Full widget
     fullRepresentation: Item {
         id: fullRep
         implicitWidth:  PlasmaCore.Units.gridUnit * 35
         implicitHeight: PlasmaCore.Units.gridUnit * 28
 
-        // -- Error banner --
+        // Error banner - always in layout, height 0 when not needed
         Rectangle {
             id: errorBanner
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
+            anchors { top: parent.top; left: parent.left; right: parent.right }
             height: (!daemonConnected || errorMessage !== "") ? PlasmaCore.Units.gridUnit * 2 : 0
-            visible: height > 0
-            color: PlasmaCore.Theme.negativeBackgroundColor
-            radius: PlasmaCore.Units.smallSpacing
             clip: true
-
+            color: PlasmaCore.Theme.negativeBackgroundColor
             RowLayout {
-                anchors.fill: parent
-                anchors.margins: PlasmaCore.Units.smallSpacing
-                spacing: PlasmaCore.Units.smallSpacing
+                anchors.fill: parent; anchors.margins: 4; spacing: 4
+                PC3.Label { text: "!"; font.bold: true; color: PlasmaCore.Theme.negativeTextColor }
                 PC3.Label {
-                    text: "!"
-                    font.bold: true
-                    color: PlasmaCore.Theme.negativeTextColor
-                }
-                PC3.Label {
-                    Layout.fillWidth: true
+                    Layout.fillWidth: true; elide: Text.ElideRight
                     text: errorMessage !== "" ? errorMessage : "Daemon not connected"
                     color: PlasmaCore.Theme.negativeTextColor
-                    elide: Text.ElideRight
                 }
                 PC3.Button {
-                    text: "Retry"
-                    visible: !daemonConnected
+                    text: "Retry"; visible: !daemonConnected
                     onClicked: { testDaemonConnection(); refreshStations() }
                 }
             }
         }
 
-        // -- Artwork box --
+        // Artwork box - fixed size, top-left below banner
         Rectangle {
             id: artworkBox
-            anchors.top: errorBanner.bottom
-            anchors.topMargin: PlasmaCore.Units.smallSpacing
-            anchors.left: parent.left
-            anchors.leftMargin: PlasmaCore.Units.smallSpacing
+            anchors { top: errorBanner.bottom; left: parent.left }
+            anchors.topMargin: 4; anchors.leftMargin: 4
             width:  PlasmaCore.Units.gridUnit * 8
             height: PlasmaCore.Units.gridUnit * 8
-            radius: PlasmaCore.Units.smallSpacing
+            radius: 4
             color: PlasmaCore.Theme.backgroundColor
             border.color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.highlightColor
             border.width: 2
 
             Image {
-                anchors.fill: parent
-                anchors.margins: 4
-                source: artworkUrl
-                fillMode: Image.PreserveAspectFit
+                anchors.fill: parent; anchors.margins: 4
+                source: artworkUrl; fillMode: Image.PreserveAspectFit
                 visible: artworkUrl !== ""
             }
             Kirigami.Icon {
-                anchors.centerIn: parent
-                source: "radio"
-                width: parent.width * 0.5
-                height: parent.height * 0.5
+                anchors.centerIn: parent; source: "radio"
+                width: parent.width * 0.5; height: parent.height * 0.5
                 visible: artworkUrl === ""
             }
         }
 
-        // -- Controls column (right of artwork) --
-        Column {
+        // Controls - top-right of artwork, same top anchor
+        ColumnLayout {
             id: controlsCol
-            anchors.top: artworkBox.top
-            anchors.left: artworkBox.right
-            anchors.leftMargin: PlasmaCore.Units.largeSpacing
-            anchors.right: parent.right
-            anchors.rightMargin: PlasmaCore.Units.smallSpacing
-            spacing: PlasmaCore.Units.smallSpacing
+            anchors {
+                top: errorBanner.bottom; topMargin: 4
+                left: artworkBox.right; leftMargin: 8
+                right: parent.right; rightMargin: 4
+            }
+            spacing: 4
 
             PC3.ComboBox {
                 id: stationCombo
-                width: parent.width
+                Layout.fillWidth: true
                 model: stationsModel
                 currentIndex: stationIndex
                 onActivated: { stationIndex = index; playCurrent() }
             }
 
             PC3.Label {
-                width: parent.width
+                Layout.fillWidth: true
                 text: selectedStation || "No Station Selected"
-                font.bold: true
-                horizontalAlignment: Text.AlignHCenter
+                font.bold: true; horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
             }
 
             PC3.Label {
-                width: parent.width
+                Layout.fillWidth: true
                 text: nowPlaying
                 horizontalAlignment: Text.AlignHCenter
-                wrapMode: Text.WordWrap
-                maximumLineCount: 2
-                elide: Text.ElideRight
+                wrapMode: Text.WordWrap; maximumLineCount: 2; elide: Text.ElideRight
             }
 
-            // Transport buttons
-            Row {
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: PlasmaCore.Units.smallSpacing
-
-                PC3.Button {
-                    text: "⏮"
-                    onClicked: prevStation()
-                    enabled: daemonConnected && stationsModel.length > 1
-                }
-                PC3.Button {
-                    text: isPlaying ? "⏸" : "▶"
-                    onClicked: togglePlay()
-                    enabled: daemonConnected
-                    highlighted: isPlaying
-                }
-                PC3.Button {
-                    text: "⏹"
-                    onClicked: stopPlayback()
-                    enabled: daemonConnected && isPlaying
-                }
-                PC3.Button {
-                    text: "⏭"
-                    onClicked: nextStation()
-                    enabled: daemonConnected && stationsModel.length > 1
-                }
-                Kirigami.Icon {
-                    source: "player-volume"
-                    width: PlasmaCore.Units.iconSizes.small
-                    height: PlasmaCore.Units.iconSizes.small
-                    anchors.verticalCenter: parent.verticalCenter
-                }
+            RowLayout {
+                Layout.fillWidth: true; Layout.alignment: Qt.AlignHCenter
+                spacing: 4
+                PC3.Button { text: "⏮"; onClicked: prevStation(); enabled: daemonConnected && stationsModel.length > 1 }
+                PC3.Button { text: isPlaying ? "⏸" : "▶"; onClicked: togglePlay(); enabled: daemonConnected; highlighted: isPlaying }
+                PC3.Button { text: "⏹"; onClicked: stopPlayback(); enabled: daemonConnected && isPlaying }
+                PC3.Button { text: "⏭"; onClicked: nextStation(); enabled: daemonConnected && stationsModel.length > 1 }
+                Kirigami.Icon { source: "player-volume"; width: 16; height: 16; Layout.alignment: Qt.AlignVCenter }
                 PC3.Slider {
                     id: volumeSlider
                     from: 0; to: 100; value: 80; stepSize: 5
-                    width: PlasmaCore.Units.gridUnit * 7
-                    anchors.verticalCenter: parent.verticalCenter
+                    Layout.preferredWidth: PlasmaCore.Units.gridUnit * 6
                     onValueChanged: if (daemonConnected) qdbusCall("SetVolume", [value])
                 }
             }
 
             PC3.Label {
-                width: parent.width
+                Layout.fillWidth: true
                 visible: stationsModel.length > 0
                 text: "Station " + (stationIndex + 1) + " of " + stationsModel.length
                 font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
-                opacity: 0.7
-                horizontalAlignment: Text.AlignHCenter
+                opacity: 0.7; horizontalAlignment: Text.AlignHCenter
             }
         }
 
-        // -- VU meter (full width, below artwork/controls) --
+        // VU meter - full width below artwork box
         Item {
             id: vuMeter
-            anchors.top: artworkBox.bottom
-            anchors.topMargin: PlasmaCore.Units.smallSpacing
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.leftMargin: PlasmaCore.Units.smallSpacing
-            anchors.rightMargin: PlasmaCore.Units.smallSpacing
+            anchors {
+                top: artworkBox.bottom; topMargin: 4
+                left: parent.left; right: parent.right
+                leftMargin: 4; rightMargin: 4
+            }
             height: PlasmaCore.Units.gridUnit * 2
 
             property var barHeights: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
@@ -720,8 +402,7 @@ PlasmoidItem {
             }
 
             Row {
-                anchors.fill: parent
-                spacing: 2
+                anchors.fill: parent; spacing: 2
                 Repeater {
                     model: vuMeter.barCount
                     delegate: Item {
@@ -730,91 +411,65 @@ PlasmoidItem {
                         Rectangle {
                             width: parent.width
                             height: Math.max(2, parent.height * vuMeter.barHeights[index])
-                            anchors.bottom: parent.bottom
-                            radius: 1
+                            anchors.bottom: parent.bottom; radius: 1
                             color: {
                                 var v = vuMeter.barHeights[index]
                                 if (v > 0.85) return "#ff3b30"
                                 if (v > 0.60) return "#ff9f0a"
                                 return PlasmaCore.Theme.positiveTextColor
                             }
-                            Behavior on height {
-                                NumberAnimation { duration: 80; easing.type: Easing.OutQuad }
-                            }
+                            Behavior on height { NumberAnimation { duration: 80; easing.type: Easing.OutQuad } }
                         }
                     }
                 }
             }
         }
 
-        // -- Options row --
-        Row {
+        // Options row - below VU meter
+        RowLayout {
             id: optionsRow
-            anchors.top: vuMeter.bottom
-            anchors.topMargin: PlasmaCore.Units.smallSpacing
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.leftMargin: PlasmaCore.Units.smallSpacing
-            anchors.rightMargin: PlasmaCore.Units.smallSpacing
-            spacing: PlasmaCore.Units.smallSpacing
+            anchors {
+                top: vuMeter.bottom; topMargin: 4
+                left: parent.left; right: parent.right
+                leftMargin: 4; rightMargin: 4
+            }
+            spacing: 4
 
             PC3.CheckBox {
-                text: "Logging"
-                checked: loggingEnabled
-                enabled: daemonConnected
+                text: "Logging"; checked: loggingEnabled; enabled: daemonConnected
                 onToggled: qdbusCall("SetLogging", [checked ? "true" : "false"])
             }
             PC3.CheckBox {
-                text: "Notifications"
-                checked: pushNotifications
-                enabled: daemonConnected
+                text: "Notifications"; checked: pushNotifications; enabled: daemonConnected
                 onToggled: qdbusCall("SetNotifications", [checked ? "true" : "false"])
             }
-            Item { width: parent.width - 400; height: 1 }
+            Item { Layout.fillWidth: true }
             PC3.Button {
-                text: "Refresh"
-                enabled: daemonConnected
+                text: "Refresh"; enabled: daemonConnected
                 onClicked: { refreshStations(); getState() }
             }
-            PC3.Button {
-                text: "Sign In"
-                enabled: daemonConnected
-                onClicked: signIn()
-            }
+            PC3.Button { text: "Sign In"; enabled: daemonConnected; onClicked: signIn() }
         }
 
-        // -- Recently Played header --
-        Row {
+        // History header - below options
+        RowLayout {
             id: historyHeader
-            anchors.top: optionsRow.bottom
-            anchors.topMargin: PlasmaCore.Units.smallSpacing
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.leftMargin: PlasmaCore.Units.smallSpacing
-            anchors.rightMargin: PlasmaCore.Units.smallSpacing
-
-            PC3.Label {
-                text: "Recently Played"
-                font.bold: true
-                width: parent.width * 0.6
+            anchors {
+                top: optionsRow.bottom; topMargin: 4
+                left: parent.left; right: parent.right
+                leftMargin: 4; rightMargin: 4
             }
-            PC3.Label {
-                text: "Global Player v3.3"
-                font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
-                opacity: 0.6
-                anchors.right: parent.right
-            }
+            PC3.Label { text: "Recently Played"; font.bold: true; Layout.fillWidth: true }
+            PC3.Label { text: "Global Player v3.3"; font.pointSize: PlasmaCore.Theme.smallestFont.pointSize; opacity: 0.6 }
         }
 
-        // -- Song history list --
+        // Song list - fills remaining space
         ListView {
-            anchors.top: historyHeader.bottom
-            anchors.topMargin: PlasmaCore.Units.smallSpacing
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            anchors.leftMargin: PlasmaCore.Units.smallSpacing
-            anchors.rightMargin: PlasmaCore.Units.smallSpacing
+            anchors {
+                top: historyHeader.bottom; topMargin: 4
+                left: parent.left; right: parent.right; bottom: parent.bottom
+                leftMargin: 4; rightMargin: 4
+            }
             clip: true
             model: playedSongsModel
             delegate: Item {
@@ -823,29 +478,22 @@ PlasmoidItem {
 
                 PC3.Label {
                     id: timeLabel
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: model.time || ""
-                    opacity: 0.6
+                    anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+                    text: model.time || ""; opacity: 0.6
                     font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
                     width: PlasmaCore.Units.gridUnit * 4
                 }
                 PC3.Label {
                     id: stationLabel
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: model.station || ""
-                    color: PlasmaCore.Theme.positiveTextColor
+                    anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                    text: model.station || ""; color: PlasmaCore.Theme.positiveTextColor
                     font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
-                    width: PlasmaCore.Units.gridUnit * 6
-                    elide: Text.ElideRight
+                    width: PlasmaCore.Units.gridUnit * 6; elide: Text.ElideRight
                     horizontalAlignment: Text.AlignRight
                 }
                 PC3.Label {
-                    anchors.left: timeLabel.right
-                    anchors.right: stationLabel.left
-                    anchors.leftMargin: PlasmaCore.Units.smallSpacing
-                    anchors.rightMargin: PlasmaCore.Units.smallSpacing
+                    anchors.left: timeLabel.right; anchors.right: stationLabel.left
+                    anchors.leftMargin: 4; anchors.rightMargin: 4
                     anchors.verticalCenter: parent.verticalCenter
                     text: (model.artist || "") + " - " + (model.song || "")
                     elide: Text.ElideRight
