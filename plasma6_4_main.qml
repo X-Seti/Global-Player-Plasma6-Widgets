@@ -530,6 +530,8 @@ PlasmoidItem {
 
     // Full widget representation
     fullRepresentation: ColumnLayout {
+        width: PlasmaCore.Units.gridUnit * 35
+        height: PlasmaCore.Units.gridUnit * 25
         Layout.preferredWidth: PlasmaCore.Units.gridUnit * 35
         Layout.preferredHeight: PlasmaCore.Units.gridUnit * 25
 
