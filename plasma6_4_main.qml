@@ -577,13 +577,17 @@ PlasmoidItem {
         // Top section - Cover art and controls
         RowLayout {
             Layout.fillWidth: true
+            Layout.minimumHeight: PlasmaCore.Units.gridUnit * 8
             spacing: PlasmaCore.Units.largeSpacing
 
             Rectangle {
                 Layout.preferredWidth: PlasmaCore.Units.gridUnit * 8
                 Layout.preferredHeight: PlasmaCore.Units.gridUnit * 8
+                Layout.minimumWidth: PlasmaCore.Units.gridUnit * 8
+                Layout.minimumHeight: PlasmaCore.Units.gridUnit * 8
+                Layout.alignment: Qt.AlignVCenter
                 radius: PlasmaCore.Units.smallSpacing
-                color: PlasmaCore.Theme.backgroundColor
+                color: "transparent"
                 border.color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.textColor
                 border.width: 2
 
@@ -595,11 +599,11 @@ PlasmoidItem {
                     visible: artworkUrl !== ""
                 }
 
-                PC3.Label {
+                Kirigami.Icon {
                     anchors.centerIn: parent
-                    text: mediaMode ? "♫" : "♪"
-                    font.pointSize: PlasmaCore.Theme.defaultFont.pointSize * 3
-                    color: PlasmaCore.Theme.textColor
+                    source: "radio"
+                    width: parent.width * 0.5
+                    height: parent.height * 0.5
                     visible: artworkUrl === ""
                 }
             }
@@ -753,6 +757,66 @@ PlasmoidItem {
                     opacity: 0.7
                     Layout.fillWidth: true
                     horizontalAlignment: Text.AlignHCenter
+                }
+
+                // VU meter - horizontal bars under buttons
+                Item {
+                    id: vuMeter
+                    Layout.fillWidth: true
+                    height: PlasmaCore.Units.gridUnit
+                    visible: daemonConnected
+
+                    property var barHeights: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+                    property int barCount: 16
+
+                    Timer {
+                        interval: 100
+                        running: isPlaying
+                        repeat: true
+                        onTriggered: {
+                            var h = []
+                            for (var i = 0; i < vuMeter.barCount; i++) {
+                                var prev = vuMeter.barHeights[i]
+                                var target = 0.1 + Math.random() * 0.9
+                                h.push(target > prev ? target : prev * 0.65)
+                            }
+                            vuMeter.barHeights = h
+                        }
+                        onRunningChanged: {
+                            if (!running) {
+                                var h = []
+                                for (var i = 0; i < vuMeter.barCount; i++) h.push(0)
+                                vuMeter.barHeights = h
+                            }
+                        }
+                    }
+
+                    Row {
+                        anchors.fill: parent
+                        spacing: 2
+                        Repeater {
+                            model: vuMeter.barCount
+                            delegate: Item {
+                                width: (vuMeter.width - (vuMeter.barCount - 1) * 2) / vuMeter.barCount
+                                height: vuMeter.height
+                                Rectangle {
+                                    width: parent.width
+                                    height: Math.max(2, parent.height * vuMeter.barHeights[index])
+                                    anchors.bottom: parent.bottom
+                                    radius: 1
+                                    color: {
+                                        var v = vuMeter.barHeights[index]
+                                        if (v > 0.85) return "#ff3b30"
+                                        if (v > 0.60) return "#ff9f0a"
+                                        return PlasmaCore.Theme.positiveTextColor
+                                    }
+                                    Behavior on height {
+                                        NumberAnimation { duration: 80; easing.type: Easing.OutQuad }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
