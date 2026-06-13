@@ -719,6 +719,72 @@ PlasmoidItem {
                         PC3.ToolTip.text: "Next Station"
                         PC3.ToolTip.visible: hovered
                     }
+
+                    // Digital VU meter
+                    Item {
+                        id: vuMeter
+                        width: PlasmaCore.Units.gridUnit * 3
+                        height: PlasmaCore.Units.gridUnit * 1.8
+                        Layout.alignment: Qt.AlignVCenter
+
+                        property var barHeights: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+                        property int barCount: 8
+
+                        Timer {
+                            id: vuTimer
+                            interval: 120
+                            running: isPlaying
+                            repeat: true
+                            onTriggered: {
+                                var h = []
+                                for (var i = 0; i < vuMeter.barCount; i++) {
+                                    var prev = vuMeter.barHeights[i]
+                                    var target = isPlaying ? (0.15 + Math.random() * 0.85) : 0.0
+                                    // Smooth: fast rise, slow fall
+                                    var next = target > prev ? target : prev * 0.6
+                                    h.push(next)
+                                }
+                                vuMeter.barHeights = h
+                            }
+                            onRunningChanged: {
+                                if (!running) {
+                                    // Decay to zero when stopped
+                                    var h = []
+                                    for (var i = 0; i < vuMeter.barCount; i++) h.push(0.0)
+                                    vuMeter.barHeights = h
+                                }
+                            }
+                        }
+
+                        Row {
+                            anchors.fill: parent
+                            spacing: 1
+
+                            Repeater {
+                                model: vuMeter.barCount
+                                delegate: Item {
+                                    width: (vuMeter.width - (vuMeter.barCount - 1)) / vuMeter.barCount
+                                    height: vuMeter.height
+
+                                    Rectangle {
+                                        width: parent.width
+                                        height: Math.max(2, parent.height * vuMeter.barHeights[index])
+                                        anchors.bottom: parent.bottom
+                                        radius: 1
+                                        color: {
+                                            var h = vuMeter.barHeights[index]
+                                            if (h > 0.85) return "#ff3b30"
+                                            if (h > 0.6)  return "#ff9f0a"
+                                            return PlasmaCore.Theme.positiveTextColor
+                                        }
+                                        Behavior on height {
+                                            NumberAnimation { duration: 80; easing.type: Easing.OutQuad }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     
                     // Volume control with icon
                     RowLayout {
