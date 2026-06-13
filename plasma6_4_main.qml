@@ -11,8 +11,8 @@ import org.kde.kirigami 2.20 as Kirigami
 PlasmoidItem {
     id: root
 
-    readonly property string App_Name: "Global Player"
-    readonly property string App_Vers: "3.3.0"
+    readonly property string appName: "Global Player"
+    readonly property string appVers: "3.3.0"
 
     // D-Bus state
     property var stationsModel: []
@@ -43,7 +43,7 @@ PlasmoidItem {
         if (nowTitle) return nowTitle
         if (selectedStation) return selectedStation
         if (!daemonConnected) return "Connecting..."
-        return App_Name
+        return appName
     }
 
     toolTipSubText: {
@@ -260,7 +260,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        Qt.callLater(function() { addToHistory(App_Name + " ready", "System") })
+        Qt.callLater(function() { addToHistory(appName + " ready", "System") })
     }
 
     onExpandedChanged: {
@@ -611,7 +611,7 @@ PlasmoidItem {
                 Layout.fillWidth: true
             }
             PC3.Label {
-                text: App_Name + " v" + App_Vers
+                text: appName + " v" + appVers
                 font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
                 opacity: 0.6
             }
