@@ -11,6 +11,9 @@ import org.kde.kirigami 2.20 as Kirigami
 PlasmoidItem {
     id: root
 
+    readonly property string App_Name: "Global Player"
+    readonly property string App_Vers: "3.3.0"
+
     // D-Bus integrated state
     property var stationsModel: []
     property int stationIndex: 0
@@ -935,7 +938,7 @@ PlasmoidItem {
             }
 
             PC3.Label {
-                text: "Global Player v3.3"
+                text: App_Name + " v" + App_Vers
                 font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
                 opacity: 0.6
             }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# X-Seti - GlobalPlayer 3.2.2 - Fixed for Plasma 6.4
+# X-Seti - GlobalPlayer 3.3.0 - Fixed for Plasma 6.4
 set -euo pipefail
 
 PLASMOID_ID="org.mooheda.globalplayer"
@@ -191,7 +191,7 @@ detect_plasma_version() {
 }
 
 # Main installation starts here
-echo "🎵 Global Player v3.2.2 Installation - Plasma 6.4 Compatible"
+echo "🎵 Global Player v3.3.0 Installation - Plasma 6.4 Compatible"
 echo "============================================================"
 
 # Check if preset directory exists
@@ -351,7 +351,7 @@ echo "✅ Plasma restarted!"
 echo "💡 Wait 10-15 seconds for Plasma to fully load"
 
 echo ""
-echo "✅ Global Player v3.2.2 installation complete!"
+echo "✅ Global Player v3.3.0 installation complete!"
 echo ""
 echo "📋 Installation Summary:"
 echo "   • Target: Plasma ${PLASMA_VERSION}"  

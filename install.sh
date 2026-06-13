@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# X-Seti - GlobalPlayer 3.2.3 - User Choice Plasma Version
+# X-Seti - GlobalPlayer 3.3.0 - User Choice Plasma Version
 set -euo pipefail
+
+APP_NAME="Global Player"
+APP_VER="3.3.0"
 
 PLASMOID_ID="org.mooheda.globalplayer"
 PLASMOID_DST="${HOME}/.local/share/plasma/plasmoids/${PLASMOID_ID}"
@@ -240,7 +243,7 @@ select_plasma_version() {
 }
 
 # Main installation starts here
-echo "🎵 Global Player v3.2.3 Installation"
+echo "🎵 ${APP_NAME} v${APP_VER} Installation"
 echo "====================================="
 
 # Check if preset directory exists
@@ -439,7 +442,7 @@ fi
 echo "✅ Plasma restarted!"
 
 echo ""
-echo "✅ Global Player v3.2.3 installation complete!"
+echo "✅ ${APP_NAME} v${APP_VER} installation complete!"
 echo ""
 echo "📋 Installation Summary:"
 echo "   • Plasma Version: ${PLASMA_VERSION}"
