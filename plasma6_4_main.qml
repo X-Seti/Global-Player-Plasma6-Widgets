@@ -580,8 +580,13 @@ PlasmoidItem {
             spacing: PlasmaCore.Units.largeSpacing
 
             Rectangle {
+                width: PlasmaCore.Units.gridUnit * 8
+                height: PlasmaCore.Units.gridUnit * 8
                 Layout.preferredWidth: PlasmaCore.Units.gridUnit * 8
                 Layout.preferredHeight: PlasmaCore.Units.gridUnit * 8
+                Layout.minimumWidth: PlasmaCore.Units.gridUnit * 8
+                Layout.minimumHeight: PlasmaCore.Units.gridUnit * 8
+                Layout.alignment: Qt.AlignTop
                 radius: PlasmaCore.Units.smallSpacing
                 color: PlasmaCore.Theme.backgroundColor
                 border.color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.textColor
@@ -863,7 +868,7 @@ PlasmoidItem {
                 spacing: PlasmaCore.Units.smallSpacing
 
                 PC3.Label {
-                    text: mediaMode ? "Media Player" : "Recently Played"
+                    text: (mediaMode ? "Media Player" : "Recently Played") + "  |  Global Player v3.3"
                     font.bold: true
                 }
 
@@ -871,6 +876,7 @@ PlasmoidItem {
                     visible: !mediaMode
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    Layout.minimumHeight: PlasmaCore.Units.gridUnit * 8
                     clip: true
                     model: playedSongsModel
                     delegate: Item {
