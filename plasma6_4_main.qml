@@ -577,7 +577,8 @@ PlasmoidItem {
         // Top section - Cover art and controls
         RowLayout {
             Layout.fillWidth: true
-            Layout.minimumHeight: PlasmaCore.Units.gridUnit * 8
+            Layout.preferredHeight: PlasmaCore.Units.gridUnit * 9
+            Layout.minimumHeight: PlasmaCore.Units.gridUnit * 9
             spacing: PlasmaCore.Units.largeSpacing
 
             Rectangle {
@@ -661,7 +662,7 @@ PlasmoidItem {
                         highlighted: ListView.isCurrentItem
                     }
                     // Show loading state when stations are not available - handled by model
-                    visible: !mediaMode && daemonConnected
+                    visible: !mediaMode
                 }
                 
                 PC3.Label {
