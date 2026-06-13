@@ -617,7 +617,7 @@ PlasmoidItem {
                     id: stationCombo
                     Layout.fillWidth: true
                     model: stationsModel
-                    textRole: "name"
+                    // plain string array - no textRole needed
                     currentIndex: stationIndex
                     onActivated: {
                         stationIndex = index
@@ -763,6 +763,7 @@ PlasmoidItem {
                 Item {
                     id: vuMeter
                     Layout.fillWidth: true
+                    Layout.preferredHeight: PlasmaCore.Units.gridUnit * 1.5
                     height: PlasmaCore.Units.gridUnit
                     visible: daemonConnected
 
@@ -923,9 +924,18 @@ PlasmoidItem {
                 anchors.margins: PlasmaCore.Units.smallSpacing
                 spacing: PlasmaCore.Units.smallSpacing
 
-                PC3.Label {
-                    text: mediaMode ? "Media Player" : "Recently Played"
-                    font.bold: true
+                RowLayout {
+                    Layout.fillWidth: true
+                    PC3.Label {
+                        text: mediaMode ? "Media Player" : "Recently Played"
+                        font.bold: true
+                        Layout.fillWidth: true
+                    }
+                    PC3.Label {
+                        text: "Global Player v3.3"
+                        font.pointSize: PlasmaCore.Theme.smallestFont.pointSize
+                        opacity: 0.6
+                    }
                 }
 
                 ListView {
