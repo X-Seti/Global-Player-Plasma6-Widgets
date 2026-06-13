@@ -1,4 +1,4 @@
-# Global Player Plasma 6.4 Widget - X-Seti - Oct 25 2025
+# Global Player Plasma 6.6 Widget - X-Seti - Jun 13 2026
 
 ## Quick Start Installation
 
@@ -10,7 +10,7 @@ cd Global-Player-Plasma6-Widgets
 chmod +x install.sh
 ./install.sh
 
-# 3. Select Plasma 6.4 (option 4) and your region (e.g., UK = option 1)
+# 3. Select Plasma 6.6 (option 4) and your region (e.g., UK = option 1)
 
 # 4. Wait for Plasma to restart (10-15 seconds)
 
@@ -40,7 +40,15 @@ qdbus org.mooheda.gpd /org/mooheda/gpd org.mooheda.gpd1.GetStations
 
 ## What's New in This Version
 
-### ✅ Plasma 6.4 Support
+### Plasma 6.6 - Jun 2026
+
+- Song list rendering offset to the right: nested ListView inside ListView removed, collapsed to single ListView with model and delegate directly on it.
+- Play without Refresh failing: playCurrent() now auto-calls refreshStations() if station model is empty, defers playback via Qt.callLater until stations load.
+- Qt.callLater called with invalid delay argument (not supported in QML): replaced with expandTimer (300ms) to refresh stations and state on widget expand.
+
+### Plasma 6.4 - Oct 2025
+
+### Plasma 6.4 Support
 - Auto-detects Plasma version (5.x, 6.0-6.3, 6.4+)
 - Uses SVG icons instead of Unicode symbols
 - Improved compatibility with latest KDE

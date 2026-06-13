@@ -1,3 +1,18 @@
+# Global Player - Plasma 6.6 Compatibility Update - X-Seti - Jun 13 2026
+
+## Fixes - plasma6_4_main.qml
+
+### Bug: Song list offset to the right
+Nested ListView inside an outer ListView with no model caused the inner list to be offset. Collapsed to a single ListView with clip, model, and delegate directly applied.
+
+### Bug: Play button fails without pressing Refresh first
+playCurrent() returned "No stations available" if stationsModel was empty. Now auto-calls refreshStations() when the model is empty, then defers _doPlay() via Qt.callLater once stations arrive. Split play logic into _doPlay() helper.
+
+### Bug: Qt.callLater called with invalid delay argument
+onExpandedChanged used Qt.callLater(fn, 500) — the second argument is not supported in QML and was silently ignored. Replaced with a dedicated expandTimer (interval: 300ms) that refreshes stations and state on widget expand.
+
+---
+
 # Global Player v3.2.2 - Plasma 6.4 Compatibility Update - X-Swti
 
 ## Summary of Issues and Fixes
