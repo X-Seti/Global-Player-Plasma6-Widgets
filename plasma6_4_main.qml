@@ -107,16 +107,7 @@ PlasmoidItem {
                 daemonConnected = false
             }
 
-            if (sourceName.indexOf("Ping") !== -1) {
-                if (out !== "" || err === "") {
-                    daemonConnected = true
-                    errorMessage = ""
-                    refreshStations()
-                    getState()
-                } else {
-                    daemonConnected = false
-                }
-            } else if (sourceName.indexOf("GetNowPlaying") !== -1) {
+            if (sourceName.indexOf("GetNowPlaying") !== -1) {
                 try {
                     var m = JSON.parse(out)
                     nowArtist = m.artist || ""
@@ -129,23 +120,29 @@ PlasmoidItem {
                 } catch(e) { console.log("GetNowPlaying parse error:", e) }
 
             } else if (sourceName.indexOf("GetState") !== -1) {
-                try {
-                    var s = JSON.parse(out)
-                    playState         = s.state         || playState
-                    loggingEnabled    = s.logging        === true
-                    pushNotifications = s.notifications  === true
-                    daemonConnected   = true
-                    errorMessage      = ""
-                    var st = s.station || ""
-                    var idx = stationsModel.indexOf(st)
-                    if (idx >= 0) {
-                        stationIndex     = idx
-                        selectedStation  = st
-                        stationCombo.currentIndex = idx
-                    }
-                    if (s.volume    !== undefined) volumeSlider.value = s.volume
-                    if (s.playDelay !== undefined) delaySlider.value  = s.playDelay
-                } catch(e) { console.log("GetState parse error:", e) }
+                if (out !== "") {
+                    try {
+                        var s = JSON.parse(out)
+                        playState         = s.state         || playState
+                        loggingEnabled    = s.logging        === true
+                        pushNotifications = s.notifications  === true
+                        daemonConnected   = true
+                        errorMessage      = ""
+                        var st = s.station || ""
+                        var idx = stationsModel.indexOf(st)
+                        if (idx >= 0) {
+                            stationIndex     = idx
+                            selectedStation  = st
+                            stationCombo.currentIndex = idx
+                        }
+                        if (s.volume    !== undefined) volumeSlider.value = s.volume
+                        if (s.playDelay !== undefined) delaySlider.value  = s.playDelay
+                        // If this was the startup ping, now load stations
+                        if (stationsModel.length === 0) refreshStations()
+                    } catch(e) { console.log("GetState parse error:", e) }
+                } else {
+                    daemonConnected = false
+                }
 
             } else if (sourceName.indexOf("GetStations") !== -1) {
                 try {
@@ -188,7 +185,8 @@ PlasmoidItem {
     }
 
     // Ping uses a unique source name so onNewData can identify it
-    function pingDaemon()      { _dbus("Ping", []) }
+    // Use GetState as connection test - it exists on the daemon
+    function pingDaemon()      { _dbus("GetState", []) }
     function getNowPlaying()   { if (daemonConnected && !mediaMode) _dbus("GetNowPlaying", []) }
     function getState()        { if (daemonConnected) _dbus("GetState", []) }
     function refreshStations() { if (!mediaMode) _dbus("GetStations", []) }
@@ -558,7 +556,7 @@ PlasmoidItem {
                 text: "Logging"
                 checked: loggingEnabled
                 enabled: daemonConnected
-                onToggled: _dbus("SetLogging", [checked ? "true" : "false"])
+                onToggled: _dbus("SetLogging", [checked])
             }
             PC3.CheckBox {
                 text: "Notifications"
@@ -576,7 +574,7 @@ PlasmoidItem {
                 id: delaySlider
                 from: 0; to: 420; value: 0; stepSize: 10
                 implicitWidth: 100
-                onMoved: { if (daemonConnected) _dbus("SetPlayDelay", [value]) }
+                onMoved: { /* SetPlayDelay not implemented in daemon */ }
                 PC3.ToolTip.text: "Play Delay: " + value + "ms"
                 PC3.ToolTip.visible: hovered
             }
