@@ -581,14 +581,18 @@ PlasmoidItem {
             spacing: PlasmaCore.Units.largeSpacing
 
             Rectangle {
+                id: artworkBox
+                width: PlasmaCore.Units.gridUnit * 8
+                height: PlasmaCore.Units.gridUnit * 8
                 Layout.preferredWidth: PlasmaCore.Units.gridUnit * 8
                 Layout.preferredHeight: PlasmaCore.Units.gridUnit * 8
                 Layout.minimumWidth: PlasmaCore.Units.gridUnit * 8
                 Layout.minimumHeight: PlasmaCore.Units.gridUnit * 8
-                Layout.alignment: Qt.AlignVCenter
+                Layout.maximumWidth: PlasmaCore.Units.gridUnit * 8
+                Layout.alignment: Qt.AlignVCenter | Qt.AlignLeft
                 radius: PlasmaCore.Units.smallSpacing
-                color: "transparent"
-                border.color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.textColor
+                color: PlasmaCore.Theme.complementaryBackgroundColor
+                border.color: isPlaying ? PlasmaCore.Theme.positiveTextColor : PlasmaCore.Theme.disabledTextColor
                 border.width: 2
 
                 Image {
@@ -610,6 +614,7 @@ PlasmoidItem {
 
             ColumnLayout {
                 Layout.fillWidth: true
+                Layout.fillHeight: true
                 spacing: PlasmaCore.Units.smallSpacing
 
                 // Station selection dropdown with cover art
@@ -763,9 +768,8 @@ PlasmoidItem {
                 Item {
                     id: vuMeter
                     Layout.fillWidth: true
-                    Layout.preferredHeight: PlasmaCore.Units.gridUnit * 1.5
-                    height: PlasmaCore.Units.gridUnit
-                    visible: daemonConnected
+                    Layout.preferredHeight: PlasmaCore.Units.gridUnit * 2
+                    Layout.minimumHeight: PlasmaCore.Units.gridUnit * 2
 
                     property var barHeights: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
                     property int barCount: 16
