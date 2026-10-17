@@ -1,8 +1,10 @@
-# Global Player v3.3.0 - Plasma 6 Widget - X-Seti - Jun 13 2026
+# Global Player v3.6.0 - Plasma 6 Widget - X-Seti - Oct 17 2026
 
 Internet radio player widget for KDE Plasma 6. Streams UK/EU/US radio via a background daemon using mpv and D-Bus.
 
 ---
+
+Fixed Cover art in control panel UI, Added UV meters and can now play local files and other streaming urls
 
 ## Quick Install
 
