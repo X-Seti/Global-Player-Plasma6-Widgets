@@ -173,6 +173,19 @@ PlasmoidItem {
         }
     }
 
+    // Fast poll for audio levels from daemon (radio mode)
+    Timer {
+        id: levelsTimer
+        interval: 50
+        running: daemonConnected && !mediaMode && isPlaying
+        repeat: true
+        onTriggered: getLevels()
+    }
+
+    // Latest levels from daemon (0..1). Empty until first GetLevels reply.
+    property var audioLevels: ({ "left": 0, "right": 0, "bands": [] })
+    property bool hasDaemonLevels: false
+
     Timer {
         id: expandTimer
         interval: 300
@@ -208,7 +221,22 @@ PlasmoidItem {
             if (err && (err.indexOf("not find") !== -1 || err.indexOf("not available") !== -1))
                 daemonConnected = false
 
-            if (sourceName.indexOf("GetNowPlaying") !== -1) {
+            if (sourceName.indexOf("GetLevels") !== -1) {
+                try {
+                    var raw = out
+                    // Strip wrapping single quotes from Python str()
+                    if (raw.length >= 2 && raw.charAt(0) === "'" && raw.charAt(raw.length - 1) === "'")
+                        raw = raw.substring(1, raw.length - 1)
+                    // Strip wrapping double quotes if the whole payload is a JSON string
+                    if (raw.length >= 2 && raw.charAt(0) === '"' && raw.charAt(raw.length - 1) === '"') {
+                        try { raw = JSON.parse(raw) } catch (e1) {}
+                    }
+                    var lv = (typeof raw === "string") ? JSON.parse(raw) : raw
+                    applyDaemonLevels(lv)
+                } catch (e) {
+                    // Missing method or bad payload — visualiser will decay
+                }
+            } else if (sourceName.indexOf("GetNowPlaying") !== -1) {
                 try {
                     var m = JSON.parse(out)
                     nowArtist = m.artist || ""
@@ -217,6 +245,8 @@ PlasmoidItem {
                     if (!mediaMode)
                         playState = m.state || playState
                     setArtworkFromPath(m.artworkPath || "")
+                    if (m.levels)
+                        applyDaemonLevels(m.levels)
                     if (!mediaMode && (nowArtist || nowTitle))
                         addToHistory(nowTitle, nowArtist)
                 } catch (e) {
@@ -319,6 +349,46 @@ PlasmoidItem {
     function getNowPlaying() {
         if (!mediaMode && daemonConnected)
             qdbusCall("GetNowPlaying", [])
+    }
+    function getLevels() {
+        if (!mediaMode && daemonConnected)
+            qdbusCall("GetLevels", [])
+    }
+
+    // Accept daemon payload and store normalised 0..1 levels
+    // Supported shapes:
+    //   { "left": 0.2, "right": 0.5 }
+    //   { "peaks": [0.2, 0.5] }
+    //   { "bands": [0.1, 0.2, ...] }   // multi-band EQ
+    //   { "left": 0.2, "right": 0.5, "bands": [...] }
+    function applyDaemonLevels(lv) {
+        if (!lv || typeof lv !== "object")
+            return
+        var left = 0, right = 0
+        var bands = []
+        if (lv.bands && lv.bands.length)
+            bands = lv.bands
+        if (lv.peaks && lv.peaks.length >= 2) {
+            left = Number(lv.peaks[0]) || 0
+            right = Number(lv.peaks[1]) || 0
+        }
+        if (lv.left !== undefined) left = Number(lv.left) || 0
+        if (lv.right !== undefined) right = Number(lv.right) || 0
+        // Clamp
+        function clamp01(x) {
+            x = Number(x)
+            if (isNaN(x)) return 0
+            if (x < 0) return 0
+            if (x > 1) return 1
+            return x
+        }
+        left = clamp01(left)
+        right = clamp01(right)
+        var b2 = []
+        for (var i = 0; i < bands.length; i++)
+            b2.push(clamp01(bands[i]))
+        audioLevels = { "left": left, "right": right, "bands": b2 }
+        hasDaemonLevels = true
     }
     function getState() {
         if (daemonConnected)
@@ -956,25 +1026,64 @@ PlasmoidItem {
             onWidthChanged: repaintAll()
             onHeightChanged: repaintAll()
 
+            // Drive bars from daemon levels (or decay to zero if none)
             Timer {
                 interval: 50
-                running: root.isPlaying
+                running: true
                 repeat: true
                 onTriggered: {
+                    var n = vuMeter.barCount
                     var levels = []
-                    for (var i = 0; i < vuMeter.barCount; i++) {
-                        var previous = vuMeter.barHeights[i] || 0
-                        var neighbour = vuMeter.barHeights[Math.max(0, i - 1)] || 0
-                        var target = 0.05 + Math.random() * 0.95
-                        target = target * 0.7 + neighbour * 0.3
-                        levels.push(target > previous ? target : previous * 0.78)
+                    var previous = vuMeter.barHeights
+                    var i
+                    var target
+
+                    if (root.isPlaying && root.hasDaemonLevels && !root.mediaMode) {
+                        var left = root.audioLevels.left || 0
+                        var right = root.audioLevels.right || 0
+                        var bands = root.audioLevels.bands || []
+
+                        if (n <= 2) {
+                            // Stereo / analog: use L/R peaks
+                            target = [left, right]
+                            for (i = 0; i < n; i++) {
+                                var prev = previous[i] || 0
+                                var tgt = target[i] !== undefined ? target[i] : 0
+                                // Fast attack, slower release
+                                levels.push(tgt > prev ? tgt : prev * 0.82 + tgt * 0.18)
+                            }
+                        } else if (bands.length >= n) {
+                            // Real multi-band from daemon
+                            for (i = 0; i < n; i++) {
+                                var prevB = previous[i] || 0
+                                var tgtB = bands[i] || 0
+                                levels.push(tgtB > prevB ? tgtB : prevB * 0.82 + tgtB * 0.18)
+                            }
+                        } else {
+                            // Synth bands from L/R until daemon sends bands[]
+                            var mid = (left + right) * 0.5
+                            for (i = 0; i < n; i++) {
+                                var frac = i / Math.max(1, n - 1)
+                                // Low bands lean on mid energy, high bands lean on peak
+                                var peak = Math.max(left, right)
+                                var tgtE = mid * (1 - frac * 0.55) + peak * (frac * 0.7)
+                                // Mild shape so it is not a flat line
+                                tgtE *= 0.75 + 0.25 * Math.sin(frac * Math.PI)
+                                var prevE = previous[i] || 0
+                                levels.push(tgtE > prevE ? tgtE : prevE * 0.82 + tgtE * 0.18)
+                            }
+                        }
+                        vuMeter.phase += 0.12 + ((left + right) * 0.5) * 0.25
+                    } else {
+                        // Stopped, media mode, or no daemon levels yet: decay
+                        for (i = 0; i < n; i++)
+                            levels.push((previous[i] || 0) * 0.88)
+                        if (!root.isPlaying)
+                            vuMeter.phase += 0.02
                     }
+
                     vuMeter.barHeights = levels
-                    vuMeter.phase += 0.18
                     vuMeter.repaintAll()
-                }
-                onRunningChanged: {
-                    if (!running) vuMeter.resetLevels()
                 }
             }
 
@@ -1168,11 +1277,11 @@ PlasmoidItem {
 
                 Timer {
                     interval: 40
-                    running: analogCanvas.visible && root.isPlaying
+                    running: analogCanvas.visible
                     repeat: true
                     onTriggered: {
-                        var tL = vuMeter.barHeights[0] || (0.15 + Math.random() * 0.8)
-                        var tR = vuMeter.barHeights[1] || (0.15 + Math.random() * 0.8)
+                        var tL = vuMeter.barHeights[0] || 0
+                        var tR = vuMeter.barHeights[1] || 0
                         analogCanvas.needleL = analogCanvas.needleL * 0.65 + tL * 0.35
                         analogCanvas.needleR = analogCanvas.needleR * 0.65 + tR * 0.35
                     }
@@ -1319,7 +1428,7 @@ PlasmoidItem {
                 Layout.fillWidth: true
             }
             PC3.Label {
-                text: "Global Player v3.8"
+                text: "Global Player v3.9"
                 font.pointSize: Kirigami.Theme.smallestFont.pointSize
                 opacity: 0.6
             }
